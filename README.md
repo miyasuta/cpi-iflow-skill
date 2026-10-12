@@ -1,5 +1,5 @@
 # cpi-iflow-skill
 
-Cloud Integration の iFlow を Git Access 経由でローカル開発するための Claude スキル。
+A Claude skill for developing SAP Cloud Integration iFlows locally via Git Access.
 
-(作成中)
+(Work in progress)
