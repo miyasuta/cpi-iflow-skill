@@ -1,0 +1,170 @@
+"""Tests for scripts/check_iflw.py.
+
+Fixtures are real .iflw files from https://github.com/miyasuta/cpi-iflow-samples
+(the commit hash is part of each file name). Run from the repository root:
+
+    python3 -m unittest discover -s tests
+"""
+
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES = os.path.join(ROOT, "tests", "fixtures")
+SCRIPT = os.path.join(ROOT, "scripts", "check_iflw.py")
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+
+import check_iflw  # noqa: E402
+
+
+def fixture(name):
+    return os.path.join(FIXTURES, name)
+
+
+def read_fixture(name):
+    with open(fixture(name), encoding="utf-8") as f:
+        return f.read()
+
+
+def check_text(text):
+    with tempfile.NamedTemporaryFile("w", suffix=".iflw", delete=False, encoding="utf-8") as f:
+        f.write(text)
+        path = f.name
+    try:
+        return check_iflw.check_file(path)
+    finally:
+        os.unlink(path)
+
+
+class ValidSamplesTest(unittest.TestCase):
+    """Files that CPI accepted must produce no errors (no false positives)."""
+
+    def test_s01_on_main_should_have_no_errors(self):
+        self.assertEqual(check_iflw.check_file(fixture("s01_main_92c8b77.iflw")), [])
+
+    def test_x01_sandbox_on_exp_should_have_no_errors(self):
+        self.assertEqual(check_iflw.check_file(fixture("x01_exp_40a9c8b.iflw")), [])
+
+    def test_locally_inserted_step_with_bpmndi_should_have_no_errors(self):
+        self.assertEqual(check_iflw.check_file(fixture("x01_d1b_395e94c.iflw")), [])
+
+
+class KnownFailuresTest(unittest.TestCase):
+    """Files that failed in CPI (experiments D-1, C-2, C-2b) must be detected."""
+
+    def test_step_without_bpmndi_should_report_missing_shape_and_edges(self):
+        errors = check_iflw.check_file(fixture("x01_d1_56e0a25.iflw"))
+        text = "\n".join(errors)
+        self.assertIn("CallActivity_Local1", text)
+        self.assertIn("no BPMNShape", text)
+        self.assertIn("SequenceFlow_Local1", text)
+        self.assertIn("no BPMNEdge", text)
+        # The existing edge still points at the End event (not re-targeted).
+        self.assertTrue(any("BPMNEdge_SequenceFlow_6" in e and "targetElement" in e for e in errors), text)
+
+    def test_unescaped_lt_in_header_table_should_be_reported(self):
+        errors = check_iflw.check_file(fixture("x01_c2_a517576.iflw"))
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("headerTable", errors[0])
+        self.assertIn("CallActivity_5", errors[0])
+
+    def test_unescaped_amp_in_header_table_should_be_reported(self):
+        errors = check_iflw.check_file(fixture("x01_c2b_7827ffc.iflw"))
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("headerTable", errors[0])
+
+
+class SyntheticFailuresTest(unittest.TestCase):
+    """Single, targeted corruptions of a valid sample."""
+
+    def setUp(self):
+        self.base = read_fixture("x01_exp_40a9c8b.iflw")
+
+    def corrupt(self, old, new):
+        self.assertIn(old, self.base)
+        return check_text(self.base.replace(old, new, 1))
+
+    def test_malformed_xml_should_be_reported(self):
+        errors = self.corrupt("</bpmn2:process>", "")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("not well-formed", errors[0])
+
+    def test_duplicate_id_should_be_reported(self):
+        errors = self.corrupt('id="SequenceFlow_Local1"', 'id="SequenceFlow_6"')
+        self.assertTrue(any("duplicate id 'SequenceFlow_6'" in e for e in errors), errors)
+
+    def test_incoming_not_matching_flow_target_should_be_reported(self):
+        errors = self.corrupt(
+            "<bpmn2:incoming>SequenceFlow_Local1</bpmn2:incoming>",
+            "<bpmn2:incoming>SequenceFlow_6</bpmn2:incoming>",
+        )
+        text = "\n".join(errors)
+        self.assertIn("EndEvent_2", text)
+        self.assertIn("SequenceFlow_Local1", text)
+
+    def test_sequence_flow_with_unknown_target_should_be_reported(self):
+        errors = self.corrupt('targetRef="EndEvent_2"', 'targetRef="EndEvent_9"')
+        self.assertTrue(any("EndEvent_9" in e for e in errors), errors)
+
+    def test_missing_participant_shape_should_be_reported(self):
+        errors = self.corrupt('bpmnElement="Participant_2"', 'bpmnElement="Participant_9"')
+        text = "\n".join(errors)
+        self.assertIn("Participant_9", text)
+        self.assertIn("participant 'Participant_2' has no BPMNShape", text)
+
+    def test_missing_message_flow_edge_should_be_reported(self):
+        errors = self.corrupt('bpmnElement="MessageFlow_4"', 'bpmnElement="MessageFlow_9"')
+        text = "\n".join(errors)
+        self.assertIn("messageFlow 'MessageFlow_4' has no BPMNEdge", text)
+
+    def test_edge_pointing_at_unknown_shape_should_be_reported(self):
+        errors = self.corrupt(
+            'sourceElement="BPMNShape_Participant_1"', 'sourceElement="BPMNShape_Participant_9"'
+        )
+        self.assertTrue(any("BPMNShape_Participant_9" in e for e in errors), errors)
+
+    def test_property_table_that_is_not_rows_and_cells_should_be_reported(self):
+        errors = self.corrupt(
+            "&lt;row&gt;&lt;cell id='Action'&gt;Create&lt;/cell&gt;&lt;cell id='Type'&gt;expression",
+            "&lt;line&gt;&lt;cell id='Action'&gt;Create&lt;/cell&gt;&lt;cell id='Type'&gt;expression",
+        )
+        self.assertTrue(any("propertyTable" in e for e in errors), errors)
+
+
+class CommandLineTest(unittest.TestCase):
+    def run_script(self, *args):
+        return subprocess.run(
+            [sys.executable, "-I", SCRIPT, *args], capture_output=True, text=True
+        )
+
+    def test_valid_file_should_exit_zero(self):
+        result = self.run_script(fixture("s01_main_92c8b77.iflw"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("OK", result.stdout)
+
+    def test_invalid_file_should_exit_one(self):
+        result = self.run_script(fixture("x01_c2_a517576.iflw"))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("headerTable", result.stdout)
+
+    def test_directory_should_check_every_iflw_below_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            sub = os.path.join(d, "a", "b")
+            os.makedirs(sub)
+            with open(os.path.join(sub, "x.iflw"), "w", encoding="utf-8") as f:
+                f.write(read_fixture("x01_c2b_7827ffc.iflw"))
+            result = self.run_script(d)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("x.iflw", result.stdout)
+
+    def test_no_iflw_found_should_exit_two(self):
+        with tempfile.TemporaryDirectory() as d:
+            result = self.run_script(d)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
