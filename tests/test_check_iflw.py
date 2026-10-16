@@ -58,6 +58,12 @@ class ValidSamplesTest(unittest.TestCase):
     def test_x01_sandbox_after_evaluations_should_have_no_errors(self):
         self.assertEqual(check_iflw.check_file(fixture("x01_exp_3bff3be.iflw")), [])
 
+    def test_valid_samples_should_have_no_warnings(self):
+        for name in ("s01_main_92c8b77.iflw", "x01_exp_40a9c8b.iflw",
+                     "x01_exp_a3c03ec.iflw", "x01_exp_3bff3be.iflw"):
+            with self.subTest(name=name):
+                self.assertEqual(check_iflw.find_warnings(fixture(name)), [])
+
 
 class KnownFailuresTest(unittest.TestCase):
     """Files that failed in CPI (experiments D-1, C-2, C-2b) must be detected."""
@@ -82,6 +88,42 @@ class KnownFailuresTest(unittest.TestCase):
         errors = check_iflw.check_file(fixture("x01_c2b_7827ffc.iflw"))
         self.assertEqual(len(errors), 1, errors)
         self.assertIn("headerTable", errors[0])
+
+
+class WarningsTest(unittest.TestCase):
+    """Problems that CPI accepts or that are unverified: reported as warnings, not errors."""
+
+    def test_edge_waypoints_left_at_old_target_should_warn(self):
+        # Evaluation 2 (Opus): SequenceFlow_Local1 was re-targeted to the new step,
+        # but its waypoints still ended at the End event. The designer drew the
+        # line to the End event; the iFlow ran correctly.
+        path = fixture("x01_eval2_4992e7a.iflw")
+        self.assertEqual(check_iflw.check_file(path), [])
+        warnings = check_iflw.find_warnings(path)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("BPMNEdge_SequenceFlow_Local1", warnings[0])
+        self.assertIn("BPMNShape_CallActivity_Local2", warnings[0])
+
+    def test_stale_waypoint_that_still_crosses_the_target_should_not_warn(self):
+        # BPMNEdge_SequenceFlow_6 ends 59 px beyond its target in many files that
+        # CPI saved, but the line passes through the target shape.
+        self.assertEqual(check_iflw.find_warnings(fixture("x01_d1b_395e94c.iflw")), [])
+
+    def test_gt_escaped_only_once_in_table_cell_should_warn(self):
+        base = read_fixture("x01_exp_a3c03ec.iflw")
+        self.assertIn("c&amp;gt;d", base)
+        with tempfile.NamedTemporaryFile("w", suffix=".iflw", delete=False, encoding="utf-8") as f:
+            f.write(base.replace("c&amp;gt;d", "c&gt;d", 1))
+            path = f.name
+        try:
+            self.assertEqual(check_iflw.check_file(path), [])
+            warnings = check_iflw.find_warnings(path)
+        finally:
+            os.unlink(path)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("headerTable", warnings[0])
+        self.assertIn("CallActivity_5", warnings[0])
+        self.assertIn("&amp;gt;", warnings[0])
 
 
 class SyntheticFailuresTest(unittest.TestCase):
@@ -176,6 +218,12 @@ class CommandLineTest(unittest.TestCase):
             result = self.run_script(d)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("x.iflw", result.stdout)
+
+    def test_warnings_only_should_exit_zero_and_print_them(self):
+        result = self.run_script(fixture("x01_eval2_4992e7a.iflw"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("warning", result.stdout)
+        self.assertIn("BPMNEdge_SequenceFlow_Local1", result.stdout)
 
     def test_missing_path_should_exit_two_without_traceback(self):
         with tempfile.TemporaryDirectory() as d:

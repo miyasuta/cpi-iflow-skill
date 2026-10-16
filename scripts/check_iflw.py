@@ -6,7 +6,7 @@ Run it after every local edit, before pushing to the Git repository:
     python3 scripts/check_iflw.py <file.iflw | directory> [...]
 
 A directory is searched recursively for *.iflw files.
-Exit code: 0 = no errors, 1 = errors found,
+Exit code: 0 = no errors (warnings may be printed), 1 = errors found,
 2 = a path does not exist or no .iflw file was found.
 
 What it checks (see references/iflw-structure.md and references/escaping.md):
@@ -23,20 +23,35 @@ What it checks (see references/iflw-structure.md and references/escaping.md):
   unescaping done by the XML parser, parse as <row><cell id='...'>...</cell></row>
   fragments.
 
+Warnings (printed, but the exit code stays 0):
+- A '>' inside a table cell that is escaped only once (&gt; instead of
+  &amp;gt;). Whether CPI accepts it is unverified.
+- The line of a BPMNEdge (its waypoints) does not reach the shape of its
+  sourceElement or targetElement. The designer draws lines along the waypoints,
+  so the diagram looks wrong; the iFlow still runs.
+
 Which bpmndi gaps actually make a Pull fail is not known, so every element is
 checked strictly. Uses the Python standard library only.
 """
 
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 
 BPMN2 = "http://www.omg.org/spec/BPMN/20100524/MODEL"
 BPMNDI = "http://www.omg.org/spec/BPMN/20100524/DI"
 IFL = "http:///com.sap.ifl.model/Ifl.xsd"
+DC = "http://www.omg.org/spec/DD/20100524/DC"
+DI = "http://www.omg.org/spec/DD/20100524/DI"
 
 # Table-type ifl:property values that hold an escaped XML fragment.
 TABLE_KEYS = ("headerTable", "propertyTable", "clientCertificates")
+
+# How far (in diagram units) an edge's line may stay from its shapes.
+WAYPOINT_TOLERANCE = 10.0
+
+TAG = re.compile(r"<[^<>]*>")
 
 # Children of a process that are not flow nodes.
 NON_NODE_TAGS = {
@@ -187,8 +202,8 @@ def check_diagram(root, by_id, nodes, participants, seq_flows, message_flows):
     return errors
 
 
-def check_tables(root):
-    errors = []
+def iter_tables(root):
+    """Yield (description, value) for every non-empty table-type ifl:property."""
     for owner in root.iter():
         ext = owner.find(q(BPMN2, "extensionElements"))
         if ext is None:
@@ -198,24 +213,124 @@ def check_tables(root):
             if key not in TABLE_KEYS:
                 continue
             value = prop.findtext("value") or ""
-            if not value.strip():
-                continue
-            where = "%s '%s', %s" % (local(owner.tag), owner.get("id"), key)
-            try:
-                table = ET.fromstring("<table>%s</table>" % value)
-            except ET.ParseError as e:
-                errors.append("%s: value is not a valid table after one level of unescaping (%s). "
-                              "Characters < & > inside a cell must be escaped twice in the .iflw "
-                              "(&amp;lt; &amp;amp; &amp;gt;)" % (where, e))
-                continue
-            for row in table:
-                if row.tag != "row" or any(c.tag != "cell" or c.get("id") is None for c in row):
-                    errors.append("%s: expected only <row><cell id='...'>...</cell></row>, found <%s>" % (
-                        where, row.tag))
-                    break
-            if table.text and table.text.strip():
-                errors.append("%s: text outside <row> elements" % where)
+            if value.strip():
+                yield "%s '%s', %s" % (local(owner.tag), owner.get("id"), key), value
+
+
+def check_tables(root):
+    errors = []
+    for where, value in iter_tables(root):
+        try:
+            table = ET.fromstring("<table>%s</table>" % value)
+        except ET.ParseError as e:
+            errors.append("%s: value is not a valid table after one level of unescaping (%s). "
+                          "Characters < & > inside a cell must be escaped twice in the .iflw "
+                          "(&amp;lt; &amp;amp; &amp;gt;)" % (where, e))
+            continue
+        for row in table:
+            if row.tag != "row" or any(c.tag != "cell" or c.get("id") is None for c in row):
+                errors.append("%s: expected only <row><cell id='...'>...</cell></row>, found <%s>" % (
+                    where, row.tag))
+                break
+        if table.text and table.text.strip():
+            errors.append("%s: text outside <row> elements" % where)
     return errors
+
+
+def find_warnings(path):
+    """Return a list of warning messages for one .iflw file.
+
+    Warnings describe problems that CPI accepts or that are unverified. A file
+    that is not well-formed XML has no warnings (check_file reports it).
+    """
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError:
+        return []
+    return warn_tables(root) + warn_waypoints(root)
+
+
+def warn_tables(root):
+    warnings = []
+    for where, value in iter_tables(root):
+        try:
+            ET.fromstring("<table>%s</table>" % value)
+        except ET.ParseError:
+            continue  # reported by check_tables
+        if ">" in TAG.sub("", value):
+            warnings.append("%s: a '>' inside a cell is escaped only once. Write it as &amp;gt; "
+                            "in the .iflw (a single escape is unverified)" % where)
+    return warnings
+
+
+def warn_waypoints(root):
+    warnings = []
+    bounds = {}
+    for shape in root.iter(q(BPMNDI, "BPMNShape")):
+        b = shape.find(q(DC, "Bounds"))
+        try:
+            bounds[shape.get("id")] = tuple(float(b.get(k)) for k in ("x", "y", "width", "height"))
+        except (AttributeError, TypeError, ValueError):
+            continue
+    for edge in root.iter(q(BPMNDI, "BPMNEdge")):
+        try:
+            points = [(float(w.get("x")), float(w.get("y"))) for w in edge.findall(q(DI, "waypoint"))]
+        except (TypeError, ValueError):
+            continue
+        if not points:
+            continue
+        for attr in ("sourceElement", "targetElement"):
+            rect = bounds.get(edge.get(attr))
+            if rect is None:
+                continue  # reported by check_diagram
+            gap = line_to_rect(points, rect)
+            if gap > WAYPOINT_TOLERANCE:
+                warnings.append("BPMNEdge '%s': its waypoints do not reach %s '%s' (%.0f away). "
+                                "The designer draws the line along the waypoints; move them to the "
+                                "edges of the connected shapes" % (edge.get("id"), attr, edge.get(attr), gap))
+    return warnings
+
+
+def line_to_rect(points, rect):
+    """Shortest distance between a polyline and a rectangle (x, y, width, height)."""
+    if len(points) == 1:
+        return point_to_rect(points[0], rect)
+    return min(segment_to_rect(points[i], points[i + 1], rect) for i in range(len(points) - 1))
+
+
+def point_to_rect(p, rect):
+    x, y, w, h = rect
+    dx = max(x - p[0], 0.0, p[0] - (x + w))
+    dy = max(y - p[1], 0.0, p[1] - (y + h))
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def point_to_segment(p, a, b):
+    ax, ay = b[0] - a[0], b[1] - a[1]
+    length2 = ax * ax + ay * ay
+    t = 0.0 if length2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * ax + (p[1] - a[1]) * ay) / length2))
+    dx, dy = p[0] - (a[0] + t * ax), p[1] - (a[1] + t * ay)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def segments_cross(a, b, c, d):
+    def orient(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    d1, d2 = orient(c, d, a), orient(c, d, b)
+    d3, d4 = orient(a, b, c), orient(a, b, d)
+    return d1 * d2 <= 0 and d3 * d4 <= 0 and not (d1 == d2 == d3 == d4 == 0)
+
+
+def segment_to_rect(a, b, rect):
+    x, y, w, h = rect
+    corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+    if point_to_rect(a, rect) == 0 or point_to_rect(b, rect) == 0:
+        return 0.0
+    sides = [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+    if any(segments_cross(a, b, c, d) for c, d in sides):
+        return 0.0
+    return min([point_to_rect(a, rect), point_to_rect(b, rect)] +
+               [point_to_segment(c, a, b) for c in corners])
 
 
 def find_iflw(paths):
@@ -246,13 +361,18 @@ def main(argv):
     failed = False
     for path in files:
         errors = check_file(path)
+        warnings = find_warnings(path)
         if errors:
             failed = True
             print("%s: %d error(s)" % (path, len(errors)))
             for e in errors:
                 print("  - %s" % e)
+        elif warnings:
+            print("%s: OK, %d warning(s)" % (path, len(warnings)))
         else:
             print("%s: OK" % path)
+        for w in warnings:
+            print("  - warning: %s" % w)
     return 1 if failed else 0
 
 

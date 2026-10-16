@@ -112,7 +112,7 @@ Connecting an adapter in the UI added a `messageFlow` and its `BPMNEdge` with `s
 
 ## References that must be consistent
 
-`scripts/check_iflw.py` checks all of these. Whether each single inconsistency makes Pull fail is **unverified**, so all are treated as errors.
+`scripts/check_iflw.py` checks all of these. Whether each single inconsistency makes Pull fail is **unverified**, so all are treated as errors. It also prints a **warning** (exit code stays 0) when the waypoints of an edge do not reach its source or target shape, as in [4992e7a]. Fix the waypoints; the warning means the diagram will look wrong.
 
 - sequenceFlow `sourceRef` / `targetRef` ↔ the nodes' `outgoing` / `incoming`
 - messageFlow `sourceRef` / `targetRef` exist (participant / start event)
