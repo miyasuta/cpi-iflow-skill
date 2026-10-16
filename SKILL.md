@@ -1,6 +1,6 @@
 ---
 name: cpi-iflow-skill
-description: Use when editing an SAP Cloud Integration (CPI) integration flow locally in a Git repository connected through Cloud Integration Git Access - files such as <iFlow>/src/main/resources/scenarioflows/integrationflow/*.iflw, META-INF/MANIFEST.MF, metainfo.prop. Covers changing Content Modifier headers, exchange properties and message body, inserting a Content Modifier, changing the iFlow Description, and changing HTTPS sender Address, CSRF and authorization settings. Also use when asked to add any other iFlow step or adapter, or to create an iFlow from scratch, so that unsupported requests are declined instead of invented.
+description: Use when editing an SAP Cloud Integration (CPI) integration flow locally in a Git repository connected through Cloud Integration Git Access - files such as <iFlow>/src/main/resources/scenarioflows/integrationflow/*.iflw, META-INF/MANIFEST.MF, metainfo.prop. Covers changing Content Modifier headers, exchange properties and message body, inserting a Content Modifier, changing the iFlow Description, and changing HTTPS sender Address, CSRF and authorization settings. Also use when asked to add any other step or adapter to an iFlow in such a Git Access repository, or to create a new iFlow in it, so that unsupported requests are declined instead of invented.
 ---
 
 # CPI iFlow local editing (v0)
@@ -13,7 +13,8 @@ Supported:
 - Content Modifier: add, change or reorder Message Header and Exchange Property rows with Type `constant` or `expression`; set the Message Body
 - Insert a Content Modifier between two existing nodes
 - Change the iFlow Description
-- Change an existing HTTPS sender's Address, CSRF protection, or authorization (not yet verified for local edits; see the reference)
+- Change an existing HTTPS sender's Address or CSRF protection
+- Change an existing HTTPS sender's authorization (not yet verified for local edits; see the reference)
 
 Not supported (no real sample yet):
 - Any other step or adapter (Router, Groovy Script, Request Reply, receivers, Splitter, Exception Subprocess, Local Integration Process, Message Mapping, …)
@@ -28,10 +29,10 @@ The user performs the CPI steps in the CPI web UI. Tell them exactly what to do 
 
 1. **Start clean.** Ask the user to Push every change saved in the CPI designer, then pull the branch locally. Unpushed UI changes cause Pull to be rejected when the same place changed, and a local Description change is silently dropped.
 2. **Edit locally.** Find the iFlow by `Bundle-Name` in `META-INF/MANIFEST.MF`, not by the `.iflw` file name.
-3. **Check:** `python3 scripts/check_iflw.py <iFlow folder>`. Fix every error before committing.
+3. **Check:** `python3 scripts/check_iflw.py <iFlow folder>`. Fix every error before committing, and fix what each warning points to (edge waypoints, a `>` escaped only once).
 4. **Commit and push** to the branch connected to the iFlow.
 5. **In CPI:** Pull → open the iFlow and check the Problems tab → Save → Deploy → wait for Started → call it and compare with the expected result.
-6. **In CPI:** Push, then pull locally. CPI normalizes the file on save; the next edit starts from that commit.
+6. **In CPI:** close edit mode (Cancel) and reload the page if the iFlow still shows as locked, then Push. Pull locally. CPI normalizes the file on save; the next edit starts from that commit.
 
 If Pull fails or the designer shows errors, see "When Pull fails" in [references/workflow.md](references/workflow.md).
 
@@ -40,6 +41,7 @@ If Pull fails or the designer shows errors, see "When Pull fails" in [references
 - Use only `ifl:property` keys, `cmdVariantUri` values and `componentVersion` values that appear in the references. If something is not there, stop and ask the user. Never invent keys, values or versions.
 - Keep every existing step's version pair as it is. For a new Content Modifier, copy the 7-key template in [references/components/content-modifier.md](references/components/content-modifier.md). An older Content Modifier version pair already in the iFlow is fine; CPI accepts it and does not migrate it.
 - For every element you add or change, write its `bpmndi` `BPMNShape` (nodes, participants) or `BPMNEdge` (sequence and message flows) and keep all references consistent. Coordinates only need to be roughly right.
+- When a flow gets a new source or target, also move its `di:waypoint` ends to the new shapes. The designer draws lines along the waypoints; changing only `sourceElement` / `targetElement` leaves the diagram wrong (the iFlow still runs).
 - Edit the iFlow Description in `bpmn2:documentation` in the `.iflw`. Never edit `metainfo.prop`: it has no effect and is overwritten by the next Push.
 - In `headerTable` / `propertyTable` cell values, escape `<`, `&`, `>` twice (`&amp;lt;`, `&amp;amp;`, `&amp;gt;`). Do not put `<` or `&` in a message body (`wrapContent`): unverified.
 - Remind the user to Pull in CPI before every Push from CPI. Pushing while the remote is ahead is unverified.
