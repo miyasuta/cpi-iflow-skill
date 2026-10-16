@@ -19,8 +19,9 @@ What it checks (see references/iflw-structure.md and references/escaping.md):
   every sequenceFlow and messageFlow has exactly one BPMNEdge.
 - Every BPMNShape/BPMNEdge points at an existing element; a BPMNEdge's
   sourceElement/targetElement are the shapes of the flow's sourceRef/targetRef.
-- headerTable/propertyTable values, after the one level of unescaping done by
-  the XML parser, parse as <row><cell id='...'>...</cell></row> fragments.
+- headerTable/propertyTable/clientCertificates values, after the one level of
+  unescaping done by the XML parser, parse as <row><cell id='...'>...</cell></row>
+  fragments.
 
 Which bpmndi gaps actually make a Pull fail is not known, so every element is
 checked strictly. Uses the Python standard library only.
@@ -35,7 +36,7 @@ BPMNDI = "http://www.omg.org/spec/BPMN/20100524/DI"
 IFL = "http:///com.sap.ifl.model/Ifl.xsd"
 
 # Table-type ifl:property values that hold an escaped XML fragment.
-TABLE_KEYS = ("headerTable", "propertyTable")
+TABLE_KEYS = ("headerTable", "propertyTable", "clientCertificates")
 
 # Children of a process that are not flow nodes.
 NON_NODE_TAGS = {

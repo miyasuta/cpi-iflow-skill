@@ -39,7 +39,7 @@ Example: the value `a<b & c>d` is written as `a&amp;lt;b &amp;amp; c&amp;gt;d` (
 | In both cases Pull succeeds. The error only appears in the designer's Problems tab (Location: Integration Flow Configuration). | [a517576], [7827ffc] |
 | Whether a `>` escaped only once is accepted is **unverified**. Always escape `>` twice too. | — |
 
-Because Pull does not catch these errors, run `scripts/check_iflw.py`: it unescapes each `headerTable` / `propertyTable` once and checks that the result parses as rows and cells.
+Because Pull does not catch these errors, run `scripts/check_iflw.py`: it unescapes each `headerTable` / `propertyTable` / `clientCertificates` once and checks that the result parses as rows and cells.
 
 ## Scope
 

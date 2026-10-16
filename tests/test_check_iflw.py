@@ -51,6 +51,13 @@ class ValidSamplesTest(unittest.TestCase):
     def test_locally_inserted_step_with_bpmndi_should_have_no_errors(self):
         self.assertEqual(check_iflw.check_file(fixture("x01_d1b_395e94c.iflw")), [])
 
+    def test_evaluation_baseline_with_empty_certificate_cells_should_have_no_errors(self):
+        # clientCertificates is a single row of empty cells in this file.
+        self.assertEqual(check_iflw.check_file(fixture("x01_exp_a3c03ec.iflw")), [])
+
+    def test_x01_sandbox_after_evaluations_should_have_no_errors(self):
+        self.assertEqual(check_iflw.check_file(fixture("x01_exp_3bff3be.iflw")), [])
+
 
 class KnownFailuresTest(unittest.TestCase):
     """Files that failed in CPI (experiments D-1, C-2, C-2b) must be detected."""
@@ -125,6 +132,16 @@ class SyntheticFailuresTest(unittest.TestCase):
             'sourceElement="BPMNShape_Participant_1"', 'sourceElement="BPMNShape_Participant_9"'
         )
         self.assertTrue(any("BPMNShape_Participant_9" in e for e in errors), errors)
+
+    def test_unescaped_amp_in_client_certificates_should_be_reported(self):
+        base = read_fixture("x01_exp_a3c03ec.iflw")
+        old = "&lt;cell id='clientCertificate.subjectDN'&gt;&lt;/cell&gt;"
+        self.assertIn(old, base)
+        errors = check_text(base.replace(
+            old, "&lt;cell id='clientCertificate.subjectDN'&gt;CN=a&amp;b&lt;/cell&gt;", 1))
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("clientCertificates", errors[0])
+        self.assertIn("MessageFlow_4", errors[0])
 
     def test_property_table_that_is_not_rows_and_cells_should_be_reported(self):
         errors = self.corrupt(
