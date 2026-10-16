@@ -14,6 +14,7 @@ A table value is an **inner XML** fragment of `<row>` / `<cell>` elements, escap
 | In the `.iflw`, the inner `<` and `>` appear as `&lt;` and `&gt;`, for example `&lt;row&gt;&lt;cell id='Action'&gt;Create&lt;/cell&gt;...`. The `'` is not escaped. | [f319ffe], [a85e897], [40a9c8b] |
 | `${...}` is not escaped in either layer, for example `${header.SAP_MessageProcessingLogID}`. | [2c68cbe] |
 | An empty table is `<value/>`. | [9d3de86], [ce88aae] |
+| CPI also writes and accepts a row of empty cells, for example `clientCertificates` after Authorization was switched back to User Role: `&lt;row&gt;&lt;cell id='clientCertificate.subjectDN'&gt;&lt;/cell&gt;&lt;cell id='clientCertificate.issuerDN'&gt;&lt;/cell&gt;&lt;/row&gt;`. | [a3c03ec] |
 
 ## `<`, `&`, `>` inside a cell value: escape twice
 
@@ -31,6 +32,7 @@ Example: the value `a<b & c>d` is written as `a&amp;lt;b &amp;amp; c&amp;gt;d` (
 |---|---|
 | Written this way, the value pulls, saves, deploys and runs. The UI shows `a<b & c>d` as Source Value and the response header value is `a<b & c>d`. | [95802b3] |
 | CPI does not rewrite the double escaping on save or Push, even after other rows were added in the UI. | [1b5d158], [a85e897] |
+| A new row with the value `x<y & z`, written as `x&amp;lt;y &amp;amp; z`, pulled, showed `x<y & z` in the designer, deployed, returned `x-eval3: x<y & z`, and was unchanged after Push. | [c6d9ca3] → [9898936] |
 | A `<` escaped only once (`&lt;` in the `.iflw`) gives a designer validation error: `org.xml.sax.SAXParseException; ... Element type "b" must be followed by either attribute specifications, ">" or "/>"`. | [a517576] |
 | An `&` escaped only once (`&amp;` in the `.iflw`) gives: `The entity name must immediately follow the '&' in the entity reference`. | [7827ffc] |
 | In both cases **the whole table appears empty** in the designer, including valid rows. Other tables and the body of the same step are not affected. | [a517576], [7827ffc] |
@@ -53,9 +55,12 @@ Because Pull does not catch these errors, run `scripts/check_iflw.py`: it unesca
 [40a9c8b]: https://github.com/miyasuta/cpi-iflow-samples/commit/40a9c8b
 [7827ffc]: https://github.com/miyasuta/cpi-iflow-samples/commit/7827ffc
 [95802b3]: https://github.com/miyasuta/cpi-iflow-samples/commit/95802b3
+[9898936]: https://github.com/miyasuta/cpi-iflow-samples/commit/9898936
 [9d3de86]: https://github.com/miyasuta/cpi-iflow-samples/commit/9d3de86
+[a3c03ec]: https://github.com/miyasuta/cpi-iflow-samples/commit/a3c03ec
 [a517576]: https://github.com/miyasuta/cpi-iflow-samples/commit/a517576
 [a85e897]: https://github.com/miyasuta/cpi-iflow-samples/commit/a85e897
 [ab24901]: https://github.com/miyasuta/cpi-iflow-samples/commit/ab24901
+[c6d9ca3]: https://github.com/miyasuta/cpi-iflow-samples/commit/c6d9ca3
 [ce88aae]: https://github.com/miyasuta/cpi-iflow-samples/commit/ce88aae
 [f319ffe]: https://github.com/miyasuta/cpi-iflow-samples/commit/f319ffe

@@ -29,7 +29,10 @@ Steps on the CPI side are done by the user in the CPI web UI. Ask the user to do
 1. **Before editing locally**, the user pushes every change saved in the CPI designer. "Unpushed changes" means changes saved in the designer but not yet pushed.
 2. Edit the files locally, run `scripts/check_iflw.py`, commit, and push to the branch connected to the iFlow.
 3. In CPI: **Pull** → open the iFlow in the designer and check the Problems tab → **Save** → **Deploy** → call the iFlow to test it.
-4. In CPI: **Push**, so the repository receives the content as CPI normalizes it (see below). Pull that commit locally before the next edit.
+4. In CPI: close edit mode (**Cancel** after Save) before leaving the designer. If the iFlow list still shows it as locked, reload the browser page (see "Push fails: artifact is locked" below).
+5. In CPI: **Push**, so the repository receives the content as CPI normalizes it (see below). Pull that commit locally before the next edit.
+
+This round trip completed, up to the final Push, for every supported kind of edit: adding header rows, inserting a Content Modifier, double-escaped values, adding a `headerTable` key, changing the HTTPS sender Address and CSRF setting ([c5b72ce], [addffca], [9898936], [bd394aa], [159c7c1], [3bff3be]).
 
 ## Pull
 
@@ -57,6 +60,13 @@ Steps on the CPI side are done by the user in the CPI web UI. Ask the user to do
 | After a merging Pull, Push creates a normal commit on top of the remote head containing both the remote and the UI changes. | [17f81ee] |
 | Pushing from CPI while the remote is ahead and has not been pulled: behavior is **unverified**. Always Pull before Push. | — |
 
+### Push fails: artifact is locked
+
+| Fact | Evidence |
+|---|---|
+| After Edit → Save → Deploy, going back to the iFlow list without closing edit mode made Push fail with `The operation cannot be performed as the artifact is locked by another user.` Opening the iFlow and pressing Edit → Cancel did not clear the "Locked by ... (you)" label in the list; reloading the browser page did, and Push then worked. | [9898936] |
+| Closing edit mode with Cancel (and reloading the page) before Push avoided the lock. Whether the reload alone is enough, or whether the lock also expires, is **unverified**. | [bd394aa], [159c7c1], [3bff3be] |
+
 ## iFlow Description
 
 | Fact | Evidence |
@@ -72,7 +82,8 @@ Steps on the CPI side are done by the user in the CPI web UI. Ask the user to do
 | Fact | Evidence |
 |---|---|
 | Hand-written IDs (`CallActivity_Local1`, `SequenceFlow_Local1`, …) are kept. | [395e94c] → [57b3074] |
-| Table rows, row order, and double escaping are not rewritten. | [95802b3] → [1b5d158] |
+| Table rows, row order, and double escaping are not rewritten. | [95802b3] → [1b5d158], [4581ce0] → [c5b72ce], [c6d9ca3] → [9898936] |
+| HTTPS sender `urlPath` and `xsrfProtection` edited locally are kept. | [96961e9] → [bd394aa], [ca0a3c9] → [159c7c1] |
 | Older `cmdVariantUri` / `componentVersion` pairs are not migrated, and table keys left out of an older step are not added. | [834f0c6] → [fa1090f], [6dab58a] → [cc2ad15] |
 | Invalid `bpmndi` coordinates are corrected. | [fc352ae] → [0c0adde] |
 | The order of children in `bpmn2:process` and in `bpmndi` may change (same meaning). | [57b3074] |
@@ -91,6 +102,8 @@ These changes carry no meaning. Ignore them when reading diffs, and do not "fix"
 | Timestamp lines in `metainfo.prop` and `parameters.prop`. | [03225bf], [9d3de86] and later |
 | `parameters.propdef` alternates between `<parameters><param_references/></parameters>` and `<parameters/>`. | [92c8b77], [1b5d158], [57b3074] |
 | Reordering of `BPMNShape` / `BPMNEdge`, of children of `bpmn2:process`, and of `ifl:property` elements. | [f319ffe], [052b9b2], [57b3074], [af09698] |
+| Rounding of coordinates, for example a receiver's `Bounds` y `114.15318` → `114.0`. | [9898936] |
+| After the user runs the designer's auto layout (format) and saves: new order of elements in the `.iflw` and new values for every `Bounds` and waypoint. Keys, values and references do not change. | [4992e7a] → [addffca] |
 
 When the user performs one UI action per commit, the diff contains only the place that was changed, apart from this noise ([03225bf]–[052b9b2], [1ef9646], [a85e897], [ce88aae], [40a9c8b]).
 
@@ -101,6 +114,7 @@ When the user performs one UI action per commit, the diff contains only the plac
 | An HTTPS sender endpoint is called at `<runtime host>/http<urlPath>`. | [052b9b2], [758b608] |
 | With the default `senderAuthType` `RoleBased` and `userRole` `ESBMessaging.send`, an OAuth `client_credentials` token from a service key with the `ESBMessaging.send` role works. | [052b9b2] |
 | Calling before the deployment shows Started returned HTTP 404 `unknown_route`; after Started, the same URL worked. That the cause is the unfinished deployment is **unverified**. Wait for Started in the Monitor. | [052b9b2] |
+| With CSRF protection on, a POST needs a CSRF token and the cookies returned with it. See [components/https-sender.md](components/https-sender.md). | [ca0a3c9] |
 | Message headers set in Content Modifiers come back as HTTP response headers, with lower-case names (`x-s01-constant`). | [052b9b2] |
 
 Never write client secrets or tokens into the repository.
@@ -108,13 +122,17 @@ Never write client secrets or tokens into the repository.
 [03225bf]: https://github.com/miyasuta/cpi-iflow-samples/commit/03225bf
 [052b9b2]: https://github.com/miyasuta/cpi-iflow-samples/commit/052b9b2
 [0c0adde]: https://github.com/miyasuta/cpi-iflow-samples/commit/0c0adde
+[159c7c1]: https://github.com/miyasuta/cpi-iflow-samples/commit/159c7c1
 [17f81ee]: https://github.com/miyasuta/cpi-iflow-samples/commit/17f81ee
 [1b5d158]: https://github.com/miyasuta/cpi-iflow-samples/commit/1b5d158
 [1ef9646]: https://github.com/miyasuta/cpi-iflow-samples/commit/1ef9646
 [24a9667]: https://github.com/miyasuta/cpi-iflow-samples/commit/24a9667
 [395e94c]: https://github.com/miyasuta/cpi-iflow-samples/commit/395e94c
+[3bff3be]: https://github.com/miyasuta/cpi-iflow-samples/commit/3bff3be
 [3dbd8d9]: https://github.com/miyasuta/cpi-iflow-samples/commit/3dbd8d9
 [40a9c8b]: https://github.com/miyasuta/cpi-iflow-samples/commit/40a9c8b
+[4581ce0]: https://github.com/miyasuta/cpi-iflow-samples/commit/4581ce0
+[4992e7a]: https://github.com/miyasuta/cpi-iflow-samples/commit/4992e7a
 [519851d]: https://github.com/miyasuta/cpi-iflow-samples/commit/519851d
 [56e0a25]: https://github.com/miyasuta/cpi-iflow-samples/commit/56e0a25
 [57b3074]: https://github.com/miyasuta/cpi-iflow-samples/commit/57b3074
@@ -125,13 +143,20 @@ Never write client secrets or tokens into the repository.
 [834f0c6]: https://github.com/miyasuta/cpi-iflow-samples/commit/834f0c6
 [92c8b77]: https://github.com/miyasuta/cpi-iflow-samples/commit/92c8b77
 [95802b3]: https://github.com/miyasuta/cpi-iflow-samples/commit/95802b3
+[96961e9]: https://github.com/miyasuta/cpi-iflow-samples/commit/96961e9
+[9898936]: https://github.com/miyasuta/cpi-iflow-samples/commit/9898936
 [9affede]: https://github.com/miyasuta/cpi-iflow-samples/commit/9affede
 [9d3de86]: https://github.com/miyasuta/cpi-iflow-samples/commit/9d3de86
 [a517576]: https://github.com/miyasuta/cpi-iflow-samples/commit/a517576
 [a85e897]: https://github.com/miyasuta/cpi-iflow-samples/commit/a85e897
+[addffca]: https://github.com/miyasuta/cpi-iflow-samples/commit/addffca
 [af09698]: https://github.com/miyasuta/cpi-iflow-samples/commit/af09698
 [bb5e4f0]: https://github.com/miyasuta/cpi-iflow-samples/commit/bb5e4f0
+[bd394aa]: https://github.com/miyasuta/cpi-iflow-samples/commit/bd394aa
 [c200359]: https://github.com/miyasuta/cpi-iflow-samples/commit/c200359
+[c5b72ce]: https://github.com/miyasuta/cpi-iflow-samples/commit/c5b72ce
+[c6d9ca3]: https://github.com/miyasuta/cpi-iflow-samples/commit/c6d9ca3
+[ca0a3c9]: https://github.com/miyasuta/cpi-iflow-samples/commit/ca0a3c9
 [cc2ad15]: https://github.com/miyasuta/cpi-iflow-samples/commit/cc2ad15
 [ce88aae]: https://github.com/miyasuta/cpi-iflow-samples/commit/ce88aae
 [dbb80e2]: https://github.com/miyasuta/cpi-iflow-samples/commit/dbb80e2
