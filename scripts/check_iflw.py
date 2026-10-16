@@ -6,7 +6,8 @@ Run it after every local edit, before pushing to the Git repository:
     python3 scripts/check_iflw.py <file.iflw | directory> [...]
 
 A directory is searched recursively for *.iflw files.
-Exit code: 0 = no errors, 1 = errors found, 2 = no .iflw file found.
+Exit code: 0 = no errors, 1 = errors found,
+2 = a path does not exist or no .iflw file was found.
 
 What it checks (see references/iflw-structure.md and references/escaping.md):
 - The file is well-formed XML.
@@ -232,6 +233,11 @@ def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__.strip())
         return 0 if argv else 2
+    missing = [p for p in argv if not os.path.exists(p)]
+    if missing:
+        for p in missing:
+            print("No such file or directory: %s" % p)
+        return 2
     files = find_iflw(argv)
     if not files:
         print("No .iflw file found in: %s" % ", ".join(argv))

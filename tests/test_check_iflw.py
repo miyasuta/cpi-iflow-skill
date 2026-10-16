@@ -160,6 +160,14 @@ class CommandLineTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("x.iflw", result.stdout)
 
+    def test_missing_path_should_exit_two_without_traceback(self):
+        with tempfile.TemporaryDirectory() as d:
+            missing = os.path.join(d, "no-such.iflw")
+            result = self.run_script(missing)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertIn("no-such.iflw", result.stdout + result.stderr)
+
     def test_no_iflw_found_should_exit_two(self):
         with tempfile.TemporaryDirectory() as d:
             result = self.run_script(d)
