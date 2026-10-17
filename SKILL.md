@@ -1,6 +1,6 @@
 ---
 name: cpi-iflow-skill
-description: Use when editing an SAP Cloud Integration (CPI) integration flow locally in a Git repository connected through Cloud Integration Git Access - files such as <iFlow>/src/main/resources/scenarioflows/integrationflow/*.iflw, META-INF/MANIFEST.MF, metainfo.prop. Covers changing Content Modifier headers, exchange properties and message body, inserting a Content Modifier, changing the iFlow Description, and changing HTTPS sender Address, CSRF and authorization settings. Also use when asked to add any other step or adapter to an iFlow in such a Git Access repository, or to create a new iFlow in it, so that unsupported requests are declined instead of invented.
+description: Use when editing an SAP Cloud Integration (CPI) integration flow locally in a Git repository connected through Cloud Integration Git Access - files such as <iFlow>/src/main/resources/scenarioflows/integrationflow/*.iflw, META-INF/MANIFEST.MF, metainfo.prop. Covers changing Content Modifier headers, exchange properties and message body, inserting a Content Modifier, changing the iFlow Description, changing HTTPS sender Address, CSRF and authorization settings, and externalized parameters ({{name}}, parameters.prop, parameters.propdef). Also use when asked to add any other step or adapter to an iFlow in such a Git Access repository, or to create a new iFlow in it, so that unsupported requests are declined instead of invented.
 ---
 
 # CPI iFlow local editing (v0)
@@ -15,11 +15,13 @@ Supported:
 - Change the iFlow Description
 - Change an existing HTTPS sender's Address or CSRF protection
 - Change an existing HTTPS sender's authorization (not yet verified for local edits; see the reference)
+- Externalized parameters: externalize the HTTPS sender Address or a Content Modifier header cell value as `{{name}}` with its default value (verified locally), or a Content Modifier body (same pattern, seen only in a UI sample); change the value of an existing parameter in `parameters.prop` (verified only for an iFlow with no values set in the Configure screen; otherwise tell the user it is unverified)
 
 Not supported (no real sample yet):
 - Any other step or adapter (Router, Groovy Script, Request Reply, receivers, Splitter, Exception Subprocess, Local Integration Process, Message Mapping, …)
 - Other Content Modifier Source Types (Header, Property, XPath, Number Range, variables), `<` or `&` in a message body
 - Creating a new iFlow or changing component versions
+- Externalizing any other field or part of a value, reusing, renaming or removing a parameter, special characters in a parameter value, or creating `parameters.prop` / `parameters.propdef` when the iFlow has none yet
 
 For an unsupported request, **do not write the XML**. Tell the user that this skill has no verified sample for it, and offer two options: build that part in the CPI designer (then Push and continue locally), or add a sample for it first (make the change in the UI, one action per commit, and Push). Do the supported part of a mixed request only if the user agrees.
 
@@ -59,5 +61,6 @@ Read only what the task needs:
 | Writing header, property or certificate table values, special characters | [references/escaping.md](references/escaping.md) |
 | Content Modifier keys, template, versions, rows, body | [references/components/content-modifier.md](references/components/content-modifier.md) |
 | HTTPS sender keys and settings | [references/components/https-sender.md](references/components/https-sender.md) |
+| Externalized parameters: `{{name}}`, `parameters.prop`, `parameters.propdef`, Configure values | [references/externalized-parameters.md](references/externalized-parameters.md) |
 
 Facts marked **unverified** in the references were not tested. When a task depends on one, tell the user and ask them to check the result in CPI.
