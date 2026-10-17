@@ -30,6 +30,11 @@ What it checks (see references/iflw-structure.md and references/escaping.md):
   file is an error only if the .iflw uses a parameter; an empty file has no
   parameters. A parameters.propdef that is not well-formed XML is an error.
   See references/externalized-parameters.md.
+- Every Groovy Script step (callActivity with activityType Script and
+  subActivityType GroovyScript) names a script file in 'script', and that
+  file exists in src/main/resources/script/ (the value is the file name only).
+  What CPI does with a missing script file is unverified, so it is an error.
+  See references/components/groovy-script.md.
 
 Warnings (printed, but the exit code stays 0):
 - A '>' inside a table cell that is escaped only once (&gt; instead of
@@ -39,6 +44,8 @@ Warnings (printed, but the exit code stays 0):
   so the diagram looks wrong; the iFlow still runs.
 - A parameter in parameters.prop or parameters.propdef that the .iflw does not
   use as {{name}}.
+- A .groovy file in src/main/resources/script/ that no Groovy Script step
+  names in 'script'.
 
 Which bpmndi gaps actually make a Pull fail is not known, so every element is
 checked strictly. Uses the Python standard library only.
@@ -65,6 +72,8 @@ TAG = re.compile(r"<[^<>]*>")
 
 # An externalized parameter in an ifl:property value: {{name}}.
 PARAM = re.compile(r"\{\{([^{}]*)\}\}")
+
+SCRIPT_DIR = "script"
 
 PROP_FILE = "parameters.prop"
 PROPDEF_FILE = "parameters.propdef"
@@ -131,6 +140,7 @@ def check_file(path):
     errors += check_diagram(root, by_id, nodes, participants, seq_flows, message_flows)
     errors += check_tables(root)
     errors += check_parameters(path, root)
+    errors += check_scripts(path, root)
     return errors
 
 
@@ -264,7 +274,8 @@ def find_warnings(path):
         root = ET.parse(path).getroot()
     except ET.ParseError:
         return []
-    return warn_tables(root) + warn_waypoints(root) + warn_parameters(path, root)
+    return (warn_tables(root) + warn_waypoints(root) + warn_parameters(path, root)
+            + warn_scripts(path, root))
 
 
 def warn_tables(root):
@@ -360,9 +371,14 @@ def used_parameters(root):
     return names
 
 
+def resources_dir(iflw_path):
+    """Return src/main/resources for a .iflw in src/main/resources/scenarioflows/integrationflow/."""
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(iflw_path))))
+
+
 def parameter_paths(iflw_path):
     """Return the paths of parameters.prop and parameters.propdef for a .iflw file."""
-    resources = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(iflw_path))))
+    resources = resources_dir(iflw_path)
     return os.path.join(resources, PROP_FILE), os.path.join(resources, PROPDEF_FILE)
 
 
@@ -432,6 +448,44 @@ def warn_parameters(iflw_path, root):
                 unused.setdefault(d, []).append(name)
     return ["parameter '%s' in %s is not used as {{%s}} in the .iflw" % (d, " and ".join(files), d)
             for d, files in sorted(unused.items())]
+
+
+def properties(el):
+    """Return {key: value} of an element's ifl:property children."""
+    ext = el.find(q(BPMN2, "extensionElements"))
+    if ext is None:
+        return {}
+    return {(p.findtext("key") or "").strip(): (p.findtext("value") or "").strip()
+            for p in ext.findall(q(IFL, "property"))}
+
+
+def groovy_steps(root):
+    """Yield (step id, script value) for every Groovy Script step."""
+    for el in root.iter(q(BPMN2, "callActivity")):
+        props = properties(el)
+        if props.get("activityType") == "Script" and props.get("subActivityType") == "GroovyScript":
+            yield el.get("id"), props.get("script", "")
+
+
+def check_scripts(iflw_path, root):
+    script_dir = os.path.join(resources_dir(iflw_path), SCRIPT_DIR)
+    errors = []
+    for step_id, script in groovy_steps(root):
+        if not script:
+            errors.append("Groovy Script step '%s' has no script file ('script' is empty)" % step_id)
+        elif not os.path.isfile(os.path.join(script_dir, script)):
+            errors.append("Groovy Script step '%s': script file '%s' not found in %s "
+                          "('script' holds the file name only)" % (step_id, script, script_dir))
+    return errors
+
+
+def warn_scripts(iflw_path, root):
+    script_dir = os.path.join(resources_dir(iflw_path), SCRIPT_DIR)
+    if not os.path.isdir(script_dir):
+        return []
+    used = {script for _, script in groovy_steps(root)}
+    return ["script file '%s' in %s is not referenced by any Groovy Script step" % (f, script_dir)
+            for f in sorted(os.listdir(script_dir)) if f.endswith(".groovy") and f not in used]
 
 
 def find_iflw(paths):

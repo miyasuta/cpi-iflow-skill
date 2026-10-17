@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><parameters>
+  <parameter>
+    <key/>
+    <name>x02Address</name>
+    <type>xsd:string</type>
+    <isRequired>false</isRequired>
+    <constraint/>
+    <description/>
+    <additionalMetadata/>
+  </parameter>
+  <parameter>
+    <key/>
+    <name>x02Greeting</name>
+    <type>xsd:string</type>
+    <isRequired>false</isRequired>
+    <constraint/>
+    <description/>
+    <additionalMetadata/>
+  </parameter>
+  <param_references>
+    <reference attribute_category="Sender" attribute_id="/attrId::urlPath" attribute_uilabel="" param_key="x02Address"/>
+  </param_references>
+</parameters>

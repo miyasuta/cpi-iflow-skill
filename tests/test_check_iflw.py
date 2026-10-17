@@ -32,12 +32,34 @@ PARAM_FIXTURES = {
     "x02_exp_0d5db9d": "X02_Sandbox",  # the same after a Push from CPI
 }
 
+# iFlow folders with a Groovy Script step and src/main/resources/script/script1.groovy.
+SCRIPT_FIXTURES = {
+    "s02_main_f268336": "S02_GroovyScript",  # built in the UI
+    "x02_exp_c058b69": "X02_Sandbox",  # inserted locally (experiment G-2), after a Push from CPI
+}
+
 
 def iflow_files(root, iflow):
     """Return (iflw, prop, propdef) paths of an iFlow folder in the Git Access layout."""
     res = os.path.join(root, iflow, "src", "main", "resources")
     iflw = os.path.join(res, "scenarioflows", "integrationflow", iflow + ".iflw")
     return iflw, os.path.join(res, "parameters.prop"), os.path.join(res, "parameters.propdef")
+
+
+def copy_iflow(test, name, iflow):
+    """Copy a fixture iFlow folder to a temporary directory and return its resources folder."""
+    d = tempfile.mkdtemp()
+    test.addCleanup(shutil.rmtree, d)
+    shutil.copytree(os.path.join(FIXTURES, name), d, dirs_exist_ok=True)
+    return os.path.join(d, iflow, "src", "main", "resources")
+
+
+def edit_file(test, path, old, new):
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    test.assertIn(old, text)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text.replace(old, new, 1))
 
 
 def read_fixture(name):
@@ -331,6 +353,81 @@ class ExternalizedParametersTest(unittest.TestCase):
         result = subprocess.run([sys.executable, "-I", SCRIPT, folder], capture_output=True, text=True)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("parameters.prop", result.stdout)
+
+
+class GroovyScriptFileTest(unittest.TestCase):
+    """The file named in a Groovy Script step's 'script' must exist in src/main/resources/script/."""
+
+    def setup_iflow(self, name):
+        iflow = SCRIPT_FIXTURES[name]
+        res = copy_iflow(self, name, iflow)
+        iflw = os.path.join(res, "scenarioflows", "integrationflow", iflow + ".iflw")
+        return iflw, os.path.join(res, "script")
+
+    def test_samples_with_groovy_step_should_have_no_errors_or_warnings(self):
+        for name, iflow in SCRIPT_FIXTURES.items():
+            with self.subTest(name=name):
+                iflw = iflow_files(os.path.join(FIXTURES, name), iflow)[0]
+                self.assertEqual(check_iflw.check_file(iflw), [])
+                self.assertEqual(check_iflw.find_warnings(iflw), [])
+
+    def test_missing_script_file_should_be_reported(self):
+        iflw, script_dir = self.setup_iflow("x02_exp_c058b69")
+        os.remove(os.path.join(script_dir, "script1.groovy"))
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("CallActivity_Local2", errors[0])
+        self.assertIn("script1.groovy", errors[0])
+        self.assertIn("not found", errors[0])
+
+    def test_script_name_pointing_at_other_file_should_be_reported(self):
+        iflw, _ = self.setup_iflow("s02_main_f268336")
+        edit_file(self, iflw, "<value>script1.groovy</value>", "<value>script2.groovy</value>")
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("script2.groovy", errors[0])
+        warnings = check_iflw.find_warnings(iflw)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("script1.groovy", warnings[0])
+        self.assertIn("not referenced", warnings[0])
+
+    def test_empty_script_value_should_be_reported(self):
+        # f7c70d0: the UI saved a Groovy step without a script; what Pull does with it is unverified.
+        iflw, _ = self.setup_iflow("s02_main_f268336")
+        edit_file(self, iflw, "<value>script1.groovy</value>", "<value/>")
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("CallActivity_5", errors[0])
+        self.assertIn("no script file", errors[0])
+
+    def test_script_value_with_path_should_be_reported(self):
+        # The samples hold the file name only; script/script1.groovy is not a file in script/script/.
+        iflw, _ = self.setup_iflow("x02_exp_c058b69")
+        edit_file(self, iflw, "<value>script1.groovy</value>", "<value>script/script1.groovy</value>")
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("script/script1.groovy", errors[0])
+
+    def test_unreferenced_groovy_file_should_warn_but_not_fail(self):
+        iflw, script_dir = self.setup_iflow("x02_exp_c058b69")
+        with open(os.path.join(script_dir, "unused.groovy"), "w", encoding="utf-8") as f:
+            f.write("// not used\n")
+        self.assertEqual(check_iflw.check_file(iflw), [])
+        warnings = check_iflw.find_warnings(iflw)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("unused.groovy", warnings[0])
+
+    def test_iflow_without_groovy_step_or_script_folder_should_have_no_errors(self):
+        iflw = iflow_files(os.path.join(FIXTURES, "x02_exp_0d5db9d"), "X02_Sandbox")[0]
+        self.assertEqual(check_iflw.check_file(iflw), [])
+        self.assertEqual(check_iflw.find_warnings(iflw), [])
+
+    def test_command_line_should_exit_one_for_missing_script_file(self):
+        iflw, script_dir = self.setup_iflow("s02_main_f268336")
+        os.remove(os.path.join(script_dir, "script1.groovy"))
+        result = subprocess.run([sys.executable, "-I", SCRIPT, iflw], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("script1.groovy", result.stdout)
 
 
 class CommandLineTest(unittest.TestCase):
