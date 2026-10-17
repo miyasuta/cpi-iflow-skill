@@ -6,12 +6,13 @@ Commit hashes link to [miyasuta/cpi-iflow-samples](https://github.com/miyasuta/c
 
 ## Supported in this skill version
 
-Changing an existing HTTPS sender's Address (`urlPath`), CSRF protection (`xsrfProtection`), and Authorization (`senderAuthType`, with `clientCertificates`). Adding a new adapter is not supported.
+Changing an existing HTTPS sender's Address (`urlPath`), CSRF protection (`xsrfProtection`), and Authorization (`senderAuthType`, with `clientCertificates`), and adding an HTTPS sender to an iFlow that has none (see "Add an HTTPS sender to an iFlow that has none" below). Adding any other adapter is not supported.
 
 | Setting | Local edit |
 |---|---|
 | Address (`urlPath`) | Verified: edited locally, pulled, saved, deployed, called, and pushed ([96961e9] → [bd394aa]). |
 | CSRF protection (`xsrfProtection`) `0` → `1` | Verified the same way ([ca0a3c9] → [159c7c1]). `1` → `0` locally: **unverified**. |
+| Add an HTTPS sender to an empty iFlow | Verified twice with `xsrfProtection` `0`: pulled, saved, deployed, called, pushed ([6e86930] → [79f6c66]), and together with an inserted Content Modifier ([3ef66d2]). |
 | Authorization (`senderAuthType`, `clientCertificates`) | **Unverified for local edits.** The values below come from changing the setting in the CPI UI and pushing. After such an edit, ask the user to check the adapter's Authorization in the designer after Pull and to report the result. |
 
 ## Keys and values
@@ -79,6 +80,120 @@ Example from [40a9c8b] (dummy values entered by hand):
 | Runtime behavior with `ClientCertificate`: **unverified** (not deployed). | — |
 | The value format when certificates are chosen with the UI's Select button: **unverified**. | — |
 
+## Add an HTTPS sender to an iFlow that has none
+
+Start from an iFlow that the user created empty in CPI and pushed (Sender, Start, End, Receiver; no `bpmn2:messageFlow`). Creating the iFlow itself is not supported. Four empty iFlows pushed by CPI had identical `.iflw` files apart from the name, with the IDs used below ([6f994f5], [9bf40a4], [1fb5209], [2f1316e]). Check that `Participant_1`, `StartEvent_2`, `BPMNShape_Participant_1` and `BPMNShape_StartEvent_2` exist before you write.
+
+1. At the end of `bpmn2:collaboration` (after the participant `Participant_Process_1`), add this `bpmn2:messageFlow` with the 20 keys in this order ([79f6c66]). Change only `urlPath`, and `xsrfProtection` if the user asks for CSRF protection (see below):
+
+```xml
+<bpmn2:messageFlow id="MessageFlow_4" name="HTTPS" sourceRef="Participant_1" targetRef="StartEvent_2">
+    <bpmn2:extensionElements>
+        <ifl:property>
+            <key>ComponentType</key>
+            <value>HTTPS</value>
+        </ifl:property>
+        <ifl:property>
+            <key>Description</key>
+            <value/>
+        </ifl:property>
+        <ifl:property>
+            <key>maximumBodySize</key>
+            <value>40</value>
+        </ifl:property>
+        <ifl:property>
+            <key>ComponentNS</key>
+            <value>sap</value>
+        </ifl:property>
+        <ifl:property>
+            <key>componentVersion</key>
+            <value>1.5</value>
+        </ifl:property>
+        <ifl:property>
+            <key>urlPath</key>
+            <value>/x02/sandbox</value>
+        </ifl:property>
+        <ifl:property>
+            <key>Name</key>
+            <value>HTTPS</value>
+        </ifl:property>
+        <ifl:property>
+            <key>TransportProtocolVersion</key>
+            <value>1.5.3</value>
+        </ifl:property>
+        <ifl:property>
+            <key>ComponentSWCVName</key>
+            <value>external</value>
+        </ifl:property>
+        <ifl:property>
+            <key>system</key>
+            <value>Sender</value>
+        </ifl:property>
+        <ifl:property>
+            <key>xsrfProtection</key>
+            <value>0</value>
+        </ifl:property>
+        <ifl:property>
+            <key>TransportProtocol</key>
+            <value>HTTPS</value>
+        </ifl:property>
+        <ifl:property>
+            <key>cmdVariantUri</key>
+            <value>ctype::AdapterVariant/cname::sap:HTTPS/tp::HTTPS/mp::None/direction::Sender/version::1.5.3</value>
+        </ifl:property>
+        <ifl:property>
+            <key>userRole</key>
+            <value>ESBMessaging.send</value>
+        </ifl:property>
+        <ifl:property>
+            <key>senderAuthType</key>
+            <value>RoleBased</value>
+        </ifl:property>
+        <ifl:property>
+            <key>MessageProtocol</key>
+            <value>None</value>
+        </ifl:property>
+        <ifl:property>
+            <key>MessageProtocolVersion</key>
+            <value>1.5.3</value>
+        </ifl:property>
+        <ifl:property>
+            <key>ComponentSWCVId</key>
+            <value>1.5.3</value>
+        </ifl:property>
+        <ifl:property>
+            <key>direction</key>
+            <value>Sender</value>
+        </ifl:property>
+        <ifl:property>
+            <key>clientCertificates</key>
+            <value/>
+        </ifl:property>
+    </bpmn2:extensionElements>
+</bpmn2:messageFlow>
+```
+
+2. In `bpmndi:BPMNPlane`, add its edge ([79f6c66], [3ef66d2]):
+
+```xml
+<bpmndi:BPMNEdge bpmnElement="MessageFlow_4" id="BPMNEdge_MessageFlow_4" sourceElement="BPMNShape_Participant_1" targetElement="BPMNShape_StartEvent_2">
+    <di:waypoint x="90.0" xsi:type="dc:Point" y="170.0"/>
+    <di:waypoint x="308.0" xsi:type="dc:Point" y="158.0"/>
+</bpmndi:BPMNEdge>
+```
+
+3. Do not create `parameters.prop` / `parameters.propdef`; CPI creates them on the first save ([79f6c66]).
+4. Run `check_iflw.py`, commit, push. In CPI: Pull → **Edit → Save** → Deploy → call. Both verified additions were saved in the designer before deployment; deploying a never-saved iFlow without Save is **unverified** (see [../workflow.md](../workflow.md)).
+5. The first save of an empty iFlow rewrites parts of the file (collaboration properties, participant keys, Start/End size 36x36 → 32x32). This appears in the next Push from CPI and is expected ([79f6c66], see [../workflow.md](../workflow.md) "An iFlow that was never saved in the designer").
+
+Results: the Address answered with HTTP 200 and, with only Start → End, returned the request body unchanged ([6e86930]). All 20 keys were unchanged after the Push from CPI ([79f6c66]).
+
+Not verified: leaving out the `BPMNEdge`, other values than `urlPath` and `xsrfProtection` `0` in a new sender, or an older version.
+
+### CSRF protection for a new sender
+
+When the user connects an HTTPS sender in the CPI UI, CSRF Protected is **on** by default (`xsrfProtection` `1`, [7decca5]); in S02 the user then turned it off ([42c1aeb]). The template above comes from S01, where it is `0`. A new sender written locally with `1` is **unverified**. If the user does not say, ask whether CSRF protection should be on: with `1`, every POST needs a CSRF token and cookies (see "Settings" above).
+
 ## Versions
 
 | Fact | Evidence |
@@ -89,9 +204,18 @@ Example from [40a9c8b] (dummy values entered by hand):
 [03225bf]: https://github.com/miyasuta/cpi-iflow-samples/commit/03225bf
 [052b9b2]: https://github.com/miyasuta/cpi-iflow-samples/commit/052b9b2
 [159c7c1]: https://github.com/miyasuta/cpi-iflow-samples/commit/159c7c1
+[1fb5209]: https://github.com/miyasuta/cpi-iflow-samples/commit/1fb5209
+[2f1316e]: https://github.com/miyasuta/cpi-iflow-samples/commit/2f1316e
+[3ef66d2]: https://github.com/miyasuta/cpi-iflow-samples/commit/3ef66d2
 [40a9c8b]: https://github.com/miyasuta/cpi-iflow-samples/commit/40a9c8b
+[42c1aeb]: https://github.com/miyasuta/cpi-iflow-samples/commit/42c1aeb
+[6e86930]: https://github.com/miyasuta/cpi-iflow-samples/commit/6e86930
+[6f994f5]: https://github.com/miyasuta/cpi-iflow-samples/commit/6f994f5
 [758b608]: https://github.com/miyasuta/cpi-iflow-samples/commit/758b608
+[79f6c66]: https://github.com/miyasuta/cpi-iflow-samples/commit/79f6c66
+[7decca5]: https://github.com/miyasuta/cpi-iflow-samples/commit/7decca5
 [96961e9]: https://github.com/miyasuta/cpi-iflow-samples/commit/96961e9
+[9bf40a4]: https://github.com/miyasuta/cpi-iflow-samples/commit/9bf40a4
 [a3c03ec]: https://github.com/miyasuta/cpi-iflow-samples/commit/a3c03ec
 [bd394aa]: https://github.com/miyasuta/cpi-iflow-samples/commit/bd394aa
 [ca0a3c9]: https://github.com/miyasuta/cpi-iflow-samples/commit/ca0a3c9
