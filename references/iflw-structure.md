@@ -66,6 +66,8 @@ Use IDs such as `CallActivity_Local1`, `SequenceFlow_Local1` for new elements an
 | Invalid coordinates (a shape at x=-500, y=5000; waypoints (0,0)→(0,0)) are not an error. The designer draws the step in its normal position and CPI rewrites the coordinates on save. Coordinates only need to be roughly right. | [fc352ae] → [0c0adde] |
 | Valid coordinates that differ from CPI's layout are not re-laid out when the designer saves (a new shape at x=580, y=200 stayed there). Seen in the designer; the saved file was not pushed before the layout was reformatted. | [4992e7a] |
 | The designer draws each line along its waypoints. A re-targeted edge whose waypoints still end at the old target is drawn to the old target, and the new step looks unconnected. Saving does not correct this. The iFlow still runs along the `sequenceFlow` references, so only the diagram is wrong. | [4992e7a] |
+| Coordinates of **existing** elements (same ID) changed locally came back as CPI's previously saved values in the next Push from CPI, even without any Save in CPI: the end waypoint of a re-targeted edge returned to its old end at the End event (`703.5`), and an End event moved from x=703 to x=730 returned to x=703. Coordinates of **new** shapes and edges kept the local values. References and the run were not affected. Seen 3 times. | [669b621], [0d5db9d], [c058b69] |
+| That CPI already uses its saved coordinates for existing elements when it pulls is **unverified** (an inference): after the Pull in [6126bba], the designer drew the new step right next to the End event, as if End were still at x=703. | [6126bba], [c058b69] |
 | The designer's auto layout (format) fixes such a diagram. It rewrites every coordinate and the element order, but no key, value or reference. | [4992e7a] → [addffca] |
 | A `BPMNEdge` refers to **shape IDs** in `sourceElement` / `targetElement` (`BPMNShape_...`) and has two or more `di:waypoint` with `xsi:type="dc:Point"`. | [03225bf], [40a9c8b] |
 | Shape sizes written by CPI: step (`callActivity`) 100x60, Start/End 32x32, sender/receiver participants 100x140, the Integration Process participant 540x220 (in S01). | [9d3de86], [40a9c8b] |
@@ -90,7 +92,7 @@ After auto layout, CPI wrote this layout ([addffca]). Other coordinates are acce
 - Steps (100x60) and Start/End (32x32) sit in one row with the same center y: steps at `y=110`, Start/End at `y=124` (center y=140), 60 apart.
 - A sequenceFlow edge has two waypoints: the right edge of the source shape (x + width, center y) and the left edge of the target shape (x, center y). Example: a step at x=362 to a step at x=522 is `462,140` → `522,140`.
 
-Place a new shape in the row between its neighbors without overlapping them. If there is no room, move the shapes after it to the right, and move the waypoints of every edge that touches a moved shape.
+Place a new shape in the row between its neighbors without overlapping them, **without moving existing shapes** if there is room: moved existing shapes may snap back (see above). In the default empty iFlow (Start x=292, End x=703, y=142), two steps fit at x=460 and x=590 (y=128, 100x60) ([3ef66d2], [6126bba]). If there is no room, you may still move the shapes after it to the right and fix the waypoints of every edge that touches a moved shape, but the designer may then show the steps crowded or overlapping. Tell the user they can fix the diagram with the designer's auto layout and Save ([4992e7a] → [addffca]); whether auto layout also fixes this snapped-back state is **unverified**.
 
 ## Inserting a step between two nodes
 
@@ -105,6 +107,8 @@ To insert a new step N into an existing sequenceFlow F (A → B). Confirmed both
 7. Add `BPMNEdge_G` with `sourceElement="BPMNShape_N"` `targetElement="BPMNShape_B"`, from the right edge of N to the left edge of B.
 
 Without the waypoint change in step 6, Pull, deploy and the run still work, but the designer shows F going to B and N without an incoming line ([4992e7a]).
+
+Write the waypoints of step 6 correctly even though CPI may later put F's old end point back (`703.5` in [669b621], [0d5db9d], [c058b69]). In those cases the old line still passed over N, so the designer showed it correctly. Do not copy such a value from a pushed file when you insert a step.
 
 The UI also updated existing waypoints and the end point of the sender message flow ([9d3de86]); the local insertion worked without those changes ([395e94c]).
 
@@ -122,14 +126,19 @@ Connecting an adapter in the UI added a `messageFlow` and its `BPMNEdge` with `s
 
 [03225bf]: https://github.com/miyasuta/cpi-iflow-samples/commit/03225bf
 [0c0adde]: https://github.com/miyasuta/cpi-iflow-samples/commit/0c0adde
+[0d5db9d]: https://github.com/miyasuta/cpi-iflow-samples/commit/0d5db9d
 [395e94c]: https://github.com/miyasuta/cpi-iflow-samples/commit/395e94c
+[3ef66d2]: https://github.com/miyasuta/cpi-iflow-samples/commit/3ef66d2
 [40a9c8b]: https://github.com/miyasuta/cpi-iflow-samples/commit/40a9c8b
 [4992e7a]: https://github.com/miyasuta/cpi-iflow-samples/commit/4992e7a
 [56e0a25]: https://github.com/miyasuta/cpi-iflow-samples/commit/56e0a25
 [57b3074]: https://github.com/miyasuta/cpi-iflow-samples/commit/57b3074
+[6126bba]: https://github.com/miyasuta/cpi-iflow-samples/commit/6126bba
+[669b621]: https://github.com/miyasuta/cpi-iflow-samples/commit/669b621
 [92c8b77]: https://github.com/miyasuta/cpi-iflow-samples/commit/92c8b77
 [9d3de86]: https://github.com/miyasuta/cpi-iflow-samples/commit/9d3de86
 [addffca]: https://github.com/miyasuta/cpi-iflow-samples/commit/addffca
 [af09698]: https://github.com/miyasuta/cpi-iflow-samples/commit/af09698
 [bb5e4f0]: https://github.com/miyasuta/cpi-iflow-samples/commit/bb5e4f0
+[c058b69]: https://github.com/miyasuta/cpi-iflow-samples/commit/c058b69
 [fc352ae]: https://github.com/miyasuta/cpi-iflow-samples/commit/fc352ae
