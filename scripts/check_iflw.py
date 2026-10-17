@@ -22,6 +22,14 @@ What it checks (see references/iflw-structure.md and references/escaping.md):
 - headerTable/propertyTable/clientCertificates values, after the one level of
   unescaping done by the XML parser, parse as <row><cell id='...'>...</cell></row>
   fragments.
+- Every externalized parameter {{name}} used in an ifl:property value is
+  defined in parameters.prop (a name=value line) and in parameters.propdef
+  (a <parameter><name>). Both files are looked up in the iFlow's
+  src/main/resources folder, two levels above the .iflw
+  (src/main/resources/scenarioflows/integrationflow/<name>.iflw). A missing
+  file is an error only if the .iflw uses a parameter; an empty file has no
+  parameters. A parameters.propdef that is not well-formed XML is an error.
+  See references/externalized-parameters.md.
 
 Warnings (printed, but the exit code stays 0):
 - A '>' inside a table cell that is escaped only once (&gt; instead of
@@ -29,6 +37,8 @@ Warnings (printed, but the exit code stays 0):
 - The line of a BPMNEdge (its waypoints) does not reach the shape of its
   sourceElement or targetElement. The designer draws lines along the waypoints,
   so the diagram looks wrong; the iFlow still runs.
+- A parameter in parameters.prop or parameters.propdef that the .iflw does not
+  use as {{name}}.
 
 Which bpmndi gaps actually make a Pull fail is not known, so every element is
 checked strictly. Uses the Python standard library only.
@@ -52,6 +62,12 @@ TABLE_KEYS = ("headerTable", "propertyTable", "clientCertificates")
 WAYPOINT_TOLERANCE = 10.0
 
 TAG = re.compile(r"<[^<>]*>")
+
+# An externalized parameter in an ifl:property value: {{name}}.
+PARAM = re.compile(r"\{\{([^{}]*)\}\}")
+
+PROP_FILE = "parameters.prop"
+PROPDEF_FILE = "parameters.propdef"
 
 # Children of a process that are not flow nodes.
 NON_NODE_TAGS = {
@@ -114,6 +130,7 @@ def check_file(path):
 
     errors += check_diagram(root, by_id, nodes, participants, seq_flows, message_flows)
     errors += check_tables(root)
+    errors += check_parameters(path, root)
     return errors
 
 
@@ -247,7 +264,7 @@ def find_warnings(path):
         root = ET.parse(path).getroot()
     except ET.ParseError:
         return []
-    return warn_tables(root) + warn_waypoints(root)
+    return warn_tables(root) + warn_waypoints(root) + warn_parameters(path, root)
 
 
 def warn_tables(root):
@@ -331,6 +348,90 @@ def segment_to_rect(a, b, rect):
         return 0.0
     return min([point_to_rect(a, rect), point_to_rect(b, rect)] +
                [point_to_segment(c, a, b) for c in corners])
+
+
+def used_parameters(root):
+    """Return the {{name}} parameters used in ifl:property values, in order of use."""
+    names = []
+    for prop in root.iter(q(IFL, "property")):
+        for name in PARAM.findall(prop.findtext("value") or ""):
+            if name not in names:
+                names.append(name)
+    return names
+
+
+def parameter_paths(iflw_path):
+    """Return the paths of parameters.prop and parameters.propdef for a .iflw file."""
+    resources = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(iflw_path))))
+    return os.path.join(resources, PROP_FILE), os.path.join(resources, PROPDEF_FILE)
+
+
+def read_prop(path):
+    """Return {name: value} from a parameters.prop file (comment lines start with # or !)."""
+    params = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f.read().splitlines():
+            line = line.strip()
+            if not line or line[0] in "#!":
+                continue
+            name, _, value = line.partition("=")
+            params[name.strip()] = value
+    return params
+
+
+def read_propdef(path):
+    """Return the <parameter><name> values of a parameters.propdef file.
+
+    An empty file has no parameters. Raises ET.ParseError if it is not well-formed.
+    """
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    if not text.strip():
+        return []
+    root = ET.fromstring(text)
+    return [(p.findtext("name") or "").strip() for p in root.iter("parameter")]
+
+
+def load_parameters(iflw_path):
+    """Return [(file name, path, set of names or None, error or None)] for prop and propdef."""
+    result = []
+    for path, reader in zip(parameter_paths(iflw_path), (read_prop, read_propdef)):
+        name = os.path.basename(path)
+        if not os.path.isfile(path):
+            result.append((name, path, None, None))
+            continue
+        try:
+            result.append((name, path, set(reader(path)), None))
+        except ET.ParseError as e:
+            result.append((name, path, None, "%s is not well-formed XML: %s" % (path, e)))
+    return result
+
+
+def check_parameters(iflw_path, root):
+    used = used_parameters(root)
+    errors = []
+    for name, path, defined, error in load_parameters(iflw_path):
+        if error:
+            errors.append(error)
+        elif defined is None:
+            if used:
+                errors.append("%s not found at %s, but the .iflw uses %s" % (
+                    name, path, ", ".join("{{%s}}" % u for u in used)))
+        else:
+            errors += ["parameter {{%s}} is used in the .iflw but not defined in %s" % (u, name)
+                       for u in used if u not in defined]
+    return errors
+
+
+def warn_parameters(iflw_path, root):
+    used = set(used_parameters(root))
+    unused = {}  # parameter -> files that define it
+    for name, _, defined, _ in load_parameters(iflw_path):
+        for d in defined or ():
+            if d not in used:
+                unused.setdefault(d, []).append(name)
+    return ["parameter '%s' in %s is not used as {{%s}} in the .iflw" % (d, " and ".join(files), d)
+            for d, files in sorted(unused.items())]
 
 
 def find_iflw(paths):

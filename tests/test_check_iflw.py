@@ -7,6 +7,7 @@ Fixtures are real .iflw files from https://github.com/miyasuta/cpi-iflow-samples
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,21 @@ import check_iflw  # noqa: E402
 
 def fixture(name):
     return os.path.join(FIXTURES, name)
+
+
+# iFlow folders with parameters.prop / parameters.propdef, in the Git Access layout.
+PARAM_FIXTURES = {
+    "s03_main_e0da8c4": "S03_ExternalizedParameters",  # externalized in the UI, Configure values set
+    "x02_exp_21c75ae": "X02_Sandbox",  # externalized locally (experiment I-1)
+    "x02_exp_0d5db9d": "X02_Sandbox",  # the same after a Push from CPI
+}
+
+
+def iflow_files(root, iflow):
+    """Return (iflw, prop, propdef) paths of an iFlow folder in the Git Access layout."""
+    res = os.path.join(root, iflow, "src", "main", "resources")
+    iflw = os.path.join(res, "scenarioflows", "integrationflow", iflow + ".iflw")
+    return iflw, os.path.join(res, "parameters.prop"), os.path.join(res, "parameters.propdef")
 
 
 def read_fixture(name):
@@ -191,6 +207,130 @@ class SyntheticFailuresTest(unittest.TestCase):
             "&lt;line&gt;&lt;cell id='Action'&gt;Create&lt;/cell&gt;&lt;cell id='Type'&gt;expression",
         )
         self.assertTrue(any("propertyTable" in e for e in errors), errors)
+
+
+class ExternalizedParametersTest(unittest.TestCase):
+    """{{name}} in the .iflw must be defined in parameters.prop and parameters.propdef."""
+
+    def copy(self, name):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        shutil.copytree(os.path.join(FIXTURES, name), d, dirs_exist_ok=True)
+        return iflow_files(d, PARAM_FIXTURES[name])
+
+    def edit(self, path, old, new):
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn(old, text)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text.replace(old, new, 1))
+
+    def test_samples_with_parameters_should_have_no_errors_or_warnings(self):
+        for name, iflow in PARAM_FIXTURES.items():
+            with self.subTest(name=name):
+                iflw = iflow_files(os.path.join(FIXTURES, name), iflow)[0]
+                self.assertEqual(check_iflw.check_file(iflw), [])
+                self.assertEqual(check_iflw.find_warnings(iflw), [])
+
+    def test_iflw_without_parameters_or_parameter_files_should_have_no_errors(self):
+        # S03 3ef66d2 had no parameters.prop / .propdef and was accepted by CPI.
+        self.assertEqual(check_iflw.check_file(fixture("s01_main_92c8b77.iflw")), [])
+
+    def test_name_missing_from_prop_should_be_reported(self):
+        iflw, prop, _ = self.copy("x02_exp_21c75ae")
+        self.edit(prop, "x02Greeting=from-prop\n", "")
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("x02Greeting", errors[0])
+        self.assertIn("parameters.prop", errors[0])
+
+    def test_name_missing_from_propdef_should_be_reported(self):
+        iflw, _, propdef = self.copy("s03_main_e0da8c4")
+        self.edit(propdef, "<name>s03Body</name>", "<name>s03Other</name>")
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("s03Body", errors[0])
+        self.assertIn("parameters.propdef", errors[0])
+        warnings = check_iflw.find_warnings(iflw)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("s03Other", warnings[0])
+
+    def test_unused_parameter_should_warn_but_not_fail(self):
+        iflw, _, _ = self.copy("x02_exp_0d5db9d")
+        self.edit(iflw, "{{x02Greeting}}", "from-iflw")
+        self.assertEqual(check_iflw.check_file(iflw), [])
+        warnings = check_iflw.find_warnings(iflw)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("x02Greeting", warnings[0])
+        self.assertIn("not used", warnings[0])
+
+    def test_missing_prop_file_should_be_reported_once(self):
+        iflw, prop, _ = self.copy("x02_exp_21c75ae")
+        os.remove(prop)
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("parameters.prop", errors[0])
+        self.assertIn("not found", errors[0])
+
+    def test_missing_propdef_file_should_be_reported_once(self):
+        iflw, _, propdef = self.copy("x02_exp_21c75ae")
+        os.remove(propdef)
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("parameters.propdef", errors[0])
+        self.assertIn("not found", errors[0])
+
+    def test_empty_prop_and_propdef_files_should_report_each_name(self):
+        iflw, prop, propdef = self.copy("x02_exp_21c75ae")
+        for path in (prop, propdef):
+            open(path, "w").close()
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 4, errors)
+        text = "\n".join(errors)
+        for name in ("x02Address", "x02Greeting"):
+            self.assertIn(name, text)
+        self.assertEqual(check_iflw.find_warnings(iflw), [])
+
+    def test_empty_parameter_files_without_parameters_should_have_no_errors(self):
+        iflw, prop, propdef = self.copy("x02_exp_21c75ae")
+        self.edit(iflw, "{{x02Address}}", "/x02/sandbox")
+        self.edit(iflw, "{{x02Greeting}}", "hello")
+        for path in (prop, propdef):
+            open(path, "w").close()
+        self.assertEqual(check_iflw.check_file(iflw), [])
+        self.assertEqual(check_iflw.find_warnings(iflw), [])
+
+    def test_missing_parameter_files_without_parameters_should_have_no_errors(self):
+        iflw, prop, propdef = self.copy("x02_exp_21c75ae")
+        self.edit(iflw, "{{x02Address}}", "/x02/sandbox")
+        self.edit(iflw, "{{x02Greeting}}", "hello")
+        os.remove(prop)
+        os.remove(propdef)
+        self.assertEqual(check_iflw.check_file(iflw), [])
+
+    def test_malformed_propdef_should_be_reported(self):
+        iflw, _, propdef = self.copy("x02_exp_21c75ae")
+        self.edit(propdef, "</parameters>", "")
+        errors = check_iflw.check_file(iflw)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("parameters.propdef", errors[0])
+        self.assertIn("not well-formed", errors[0])
+
+    def test_prop_without_trailing_newline_should_be_read(self):
+        # 0d5db9d: CPI wrote parameters.prop without a final newline.
+        _, prop, _ = iflow_files(os.path.join(FIXTURES, "x02_exp_0d5db9d"), "X02_Sandbox")
+        with open(prop, encoding="utf-8") as f:
+            self.assertFalse(f.read().endswith("\n"))
+        self.assertEqual(check_iflw.read_prop(prop),
+                         {"x02Address": "/x02/externalized", "x02Greeting": "changed-locally"})
+
+    def test_command_line_should_exit_one_for_undefined_parameter(self):
+        iflw, prop, _ = self.copy("x02_exp_21c75ae")
+        os.remove(prop)
+        folder = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(iflw)))))
+        result = subprocess.run([sys.executable, "-I", SCRIPT, folder], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("parameters.prop", result.stdout)
 
 
 class CommandLineTest(unittest.TestCase):
