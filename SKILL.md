@@ -1,6 +1,6 @@
 ---
 name: cpi-iflow-skill
-description: Use when editing an SAP Cloud Integration (CPI) integration flow locally in a Git repository connected through Cloud Integration Git Access - files such as <iFlow>/src/main/resources/scenarioflows/integrationflow/*.iflw, META-INF/MANIFEST.MF, metainfo.prop. Covers changing Content Modifier headers, exchange properties and message body, inserting a Content Modifier, changing the iFlow Description, changing HTTPS sender Address, CSRF and authorization settings, and externalized parameters ({{name}}, parameters.prop, parameters.propdef). Also use when asked to add any other step or adapter to an iFlow in such a Git Access repository, or to create a new iFlow in it, so that unsupported requests are declined instead of invented.
+description: Use when editing an SAP Cloud Integration (CPI) integration flow locally in a Git repository connected through Cloud Integration Git Access - files such as <iFlow>/src/main/resources/scenarioflows/integrationflow/*.iflw, META-INF/MANIFEST.MF, metainfo.prop. Covers changing Content Modifier headers, exchange properties and message body, inserting a Content Modifier, inserting a Groovy Script step or changing its script (script/*.groovy), changing the iFlow Description, adding an HTTPS sender to an empty iFlow or changing its Address, CSRF and authorization settings, and externalized parameters ({{name}}, parameters.prop, parameters.propdef). Also use when asked to add any other step or adapter to an iFlow in such a Git Access repository, or to create a new iFlow in it, so that unsupported requests are declined instead of invented.
 ---
 
 # CPI iFlow local editing (v0)
@@ -13,14 +13,17 @@ Supported:
 - Content Modifier: add, change or reorder Message Header and Exchange Property rows with Type `constant` or `expression`; set the Message Body
 - Insert a Content Modifier between two existing nodes
 - Change the iFlow Description
+- Add an HTTPS sender to an iFlow that has none (an empty iFlow created in CPI; verified with CSRF protection off, saved in CPI before deployment)
 - Change an existing HTTPS sender's Address or CSRF protection
 - Change an existing HTTPS sender's authorization (not yet verified for local edits; see the reference)
+- Groovy Script: insert a step with a new script file between two existing nodes (verified once, after a Content Modifier), and change the code of an existing script file (verified). Reading an HTTP request header in a script needs Allowed Header(s); setting it locally is unverified
 - Externalized parameters: externalize the HTTPS sender Address or a Content Modifier header cell value as `{{name}}` with its default value (verified locally), or a Content Modifier body (same pattern, seen only in a UI sample); change the value of an existing parameter in `parameters.prop` (verified only for an iFlow with no values set in the Configure screen; otherwise tell the user it is unverified)
 
 Not supported (no real sample yet):
-- Any other step or adapter (Router, Groovy Script, Request Reply, receivers, Splitter, Exception Subprocess, Local Integration Process, Message Mapping, …)
+- Any other step or adapter (Router, JavaScript or other script types, Request Reply, receivers, Splitter, Exception Subprocess, Local Integration Process, Message Mapping, …)
+- Groovy Script with a Script Collection (`scriptBundleId`), a function other than `processData` (`scriptFunction`), or a script file outside `src/main/resources/script/`
 - Other Content Modifier Source Types (Header, Property, XPath, Number Range, variables), `<` or `&` in a message body
-- Creating a new iFlow or changing component versions
+- Creating a new iFlow from scratch (`MANIFEST.MF`, `.project`, …) or changing component versions. A new iFlow starts empty in CPI: the user creates it there, connects it to the branch and pushes; then edit it locally
 - Externalizing any other field or part of a value, reusing, renaming or removing a parameter, special characters in a parameter value, or creating `parameters.prop` / `parameters.propdef` when the iFlow has none yet
 
 For an unsupported request, **do not write the XML**. Tell the user that this skill has no verified sample for it, and offer two options: build that part in the CPI designer (then Push and continue locally), or add a sample for it first (make the change in the UI, one action per commit, and Push). Do the supported part of a mixed request only if the user agrees.
@@ -29,9 +32,11 @@ For an unsupported request, **do not write the XML**. Tell the user that this sk
 
 The user performs the CPI steps in the CPI web UI. Tell them exactly what to do and ask for the result.
 
+For a new iFlow, ask the user to create it empty in CPI (Sender, Start, End, Receiver), connect it to the branch and Push, then start at step 1. The skill never writes a new iFlow folder.
+
 1. **Start clean.** Ask the user to Push every change saved in CPI (designer or Configure screen), then pull the branch locally. Unpushed CPI changes cause Pull to be rejected when the same place changed, and a local Description change is silently dropped.
 2. **Edit locally.** Find the iFlow by `Bundle-Name` in `META-INF/MANIFEST.MF`, not by the `.iflw` file name.
-3. **Check:** `python3 scripts/check_iflw.py <iFlow folder>`. Fix every error before committing, and fix what each warning points to (edge waypoints, a `>` escaped only once, an unused parameter). For each `.iflw` it also reads `parameters.prop` and `parameters.propdef` from the iFlow's `src/main/resources/` folder (two levels above `scenarioflows/integrationflow/<name>.iflw`), so keep the Git Access layout: every `{{name}}` must be defined in both files.
+3. **Check:** `python3 scripts/check_iflw.py <iFlow folder>`. Fix every error before committing, and fix what each warning points to (edge waypoints, a `>` escaped only once, an unused parameter, an unreferenced `.groovy` file). For each `.iflw` it also reads `parameters.prop` and `parameters.propdef` from the iFlow's `src/main/resources/` folder (two levels above `scenarioflows/integrationflow/<name>.iflw`), so keep the Git Access layout: every `{{name}}` must be defined in both files, and every Groovy Script step's `script` file must exist in `src/main/resources/script/`.
 4. **Commit and push** to the branch connected to the iFlow.
 5. **In CPI:** Pull → Deploy (no Edit or Save needed) → wait for Started → call it and compare with the expected result. If the iFlow was never saved in the CPI designer, ask the user to Edit → Save before Deploy (deploying it without Save is unverified). If the deployment fails or the result is wrong, ask the user to open the iFlow and check the Problems tab.
 6. **No Push from CPI is needed.** The next local edit continues from your own commit. Only if the user did Edit → Save or changed Configure values in CPI: close edit mode (Cancel), reload the page if the iFlow still shows as locked, Push, and pull locally before the next edit.
@@ -41,8 +46,8 @@ If Pull fails or the designer shows errors, see "When Pull fails" in [references
 ## Rules
 
 - Use only `ifl:property` keys, `cmdVariantUri` values and `componentVersion` values that appear in the references. If something is not there, stop and ask the user. Never invent keys, values or versions.
-- Keep every existing step's version pair as it is. For a new Content Modifier, copy the 7-key template in [references/components/content-modifier.md](references/components/content-modifier.md). An older Content Modifier version pair already in the iFlow is fine; CPI accepts it and does not migrate it.
-- For every element you add or change, write its `bpmndi` `BPMNShape` (nodes, participants) or `BPMNEdge` (sequence and message flows) and keep all references consistent. Coordinates only need to be roughly right.
+- Keep every existing step's version pair as it is. For a new Content Modifier, copy the 7-key template in [references/components/content-modifier.md](references/components/content-modifier.md); for a new Groovy Script step, the 7-key template in [references/components/groovy-script.md](references/components/groovy-script.md); for a new HTTPS sender, the 20-key message flow in [references/components/https-sender.md](references/components/https-sender.md). An older Content Modifier version pair already in the iFlow is fine; CPI accepts it and does not migrate it.
+- For every element you add or change, write its `bpmndi` `BPMNShape` (nodes, participants) or `BPMNEdge` (sequence and message flows) and keep all references consistent. Coordinates only need to be roughly right. Place a new step where it fits without moving existing shapes when possible: CPI may put existing shapes and edge ends back to their saved coordinates (see [references/iflw-structure.md](references/iflw-structure.md)).
 - When a flow gets a new source or target, also move its `di:waypoint` ends to the new shapes. The designer draws lines along the waypoints; changing only `sourceElement` / `targetElement` leaves the diagram wrong (the iFlow still runs).
 - Edit the iFlow Description in `bpmn2:documentation` in the `.iflw`. Never edit `metainfo.prop`: it has no effect and is overwritten by the next Push.
 - In `headerTable` / `propertyTable` cell values, escape `<`, `&`, `>` twice (`&amp;lt;`, `&amp;amp;`, `&amp;gt;`). Do not put `<` or `&` in a message body (`wrapContent`): unverified.
@@ -60,7 +65,8 @@ Read only what the task needs:
 | Adding or connecting elements, IDs, `bpmndi`, inserting a step | [references/iflw-structure.md](references/iflw-structure.md) |
 | Writing header, property or certificate table values, special characters | [references/escaping.md](references/escaping.md) |
 | Content Modifier keys, template, versions, rows, body | [references/components/content-modifier.md](references/components/content-modifier.md) |
-| HTTPS sender keys and settings | [references/components/https-sender.md](references/components/https-sender.md) |
+| HTTPS sender keys and settings, adding an HTTPS sender to an empty iFlow | [references/components/https-sender.md](references/components/https-sender.md) |
+| Groovy Script step template, script file, Allowed Header(s) | [references/components/groovy-script.md](references/components/groovy-script.md) |
 | Externalized parameters: `{{name}}`, `parameters.prop`, `parameters.propdef`, Configure values | [references/externalized-parameters.md](references/externalized-parameters.md) |
 
 Facts marked **unverified** in the references were not tested. When a task depends on one, tell the user and ask them to check the result in CPI.
