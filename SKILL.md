@@ -29,12 +29,12 @@ For an unsupported request, **do not write the XML**. Tell the user that this sk
 
 The user performs the CPI steps in the CPI web UI. Tell them exactly what to do and ask for the result.
 
-1. **Start clean.** Ask the user to Push every change saved in the CPI designer, then pull the branch locally. Unpushed UI changes cause Pull to be rejected when the same place changed, and a local Description change is silently dropped.
+1. **Start clean.** Ask the user to Push every change saved in CPI (designer or Configure screen), then pull the branch locally. Unpushed CPI changes cause Pull to be rejected when the same place changed, and a local Description change is silently dropped.
 2. **Edit locally.** Find the iFlow by `Bundle-Name` in `META-INF/MANIFEST.MF`, not by the `.iflw` file name.
 3. **Check:** `python3 scripts/check_iflw.py <iFlow folder>`. Fix every error before committing, and fix what each warning points to (edge waypoints, a `>` escaped only once, an unused parameter). For each `.iflw` it also reads `parameters.prop` and `parameters.propdef` from the iFlow's `src/main/resources/` folder (two levels above `scenarioflows/integrationflow/<name>.iflw`), so keep the Git Access layout: every `{{name}}` must be defined in both files.
 4. **Commit and push** to the branch connected to the iFlow.
-5. **In CPI:** Pull → open the iFlow and check the Problems tab → Save → Deploy → wait for Started → call it and compare with the expected result.
-6. **In CPI:** close edit mode (Cancel) and reload the page if the iFlow still shows as locked, then Push. Pull locally. CPI normalizes the file on save; the next edit starts from that commit.
+5. **In CPI:** Pull → Deploy (no Edit or Save needed) → wait for Started → call it and compare with the expected result. If the iFlow was never saved in the CPI designer, ask the user to Edit → Save before Deploy (deploying it without Save is unverified). If the deployment fails or the result is wrong, ask the user to open the iFlow and check the Problems tab.
+6. **No Push from CPI is needed.** The next local edit continues from your own commit. Only if the user did Edit → Save or changed Configure values in CPI: close edit mode (Cancel), reload the page if the iFlow still shows as locked, Push, and pull locally before the next edit.
 
 If Pull fails or the designer shows errors, see "When Pull fails" in [references/workflow.md](references/workflow.md).
 
