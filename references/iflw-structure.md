@@ -66,7 +66,7 @@ Use IDs such as `CallActivity_Local1`, `SequenceFlow_Local1` for new elements an
 | Invalid coordinates (a shape at x=-500, y=5000; waypoints (0,0)→(0,0)) are not an error. The designer draws the step in its normal position and CPI rewrites the coordinates on save. Coordinates only need to be roughly right. | [fc352ae] → [0c0adde] |
 | Valid coordinates that differ from CPI's layout are not re-laid out when the designer saves (a new shape at x=580, y=200 stayed there). Seen in the designer; the saved file was not pushed before the layout was reformatted. | [4992e7a] |
 | The designer draws each line along its waypoints. A re-targeted edge whose waypoints still end at the old target is drawn to the old target, and the new step looks unconnected. Saving does not correct this. The iFlow still runs along the `sequenceFlow` references, so only the diagram is wrong. | [4992e7a] |
-| Coordinates of **existing** elements (same ID) changed locally came back as CPI's previously saved values in the next Push from CPI, even without any Save in CPI: the end waypoint of a re-targeted edge returned to its old end at the End event (`703.5`), and an End event moved from x=703 to x=730 returned to x=703. Coordinates of **new** shapes and edges kept the local values. References and the run were not affected. Seen 3 times. | [669b621], [0d5db9d], [c058b69] |
+| Coordinates of **existing** elements (same ID) changed locally came back as CPI's previously saved values in the next Push from CPI, even without any Save in CPI: the end waypoint of a re-targeted edge returned to its old end at the End event (`703.5`), and an End event moved from x=703 to x=730 returned to x=703. Coordinates of **new** shapes and edges kept the local values. References and the run were not affected. Seen 4 times, the 4th in files that CPI saved after Pull ([4125596] → [119da02]: the re-targeted edge went back to `323.5,158.0 → 703.5,158.0`). | [669b621], [0d5db9d], [c058b69], [119da02] |
 | That CPI already uses its saved coordinates for existing elements when it pulls is **unverified** (an inference): after the Pull in [6126bba], the designer drew the new step right next to the End event, as if End were still at x=703. | [6126bba], [c058b69] |
 | The designer's auto layout (format) fixes such a diagram. It rewrites every coordinate and the element order, but no key, value or reference. | [4992e7a] → [addffca] |
 | A `BPMNEdge` refers to **shape IDs** in `sourceElement` / `targetElement` (`BPMNShape_...`) and has two or more `di:waypoint` with `xsi:type="dc:Point"`. | [03225bf], [40a9c8b] |
@@ -92,7 +92,15 @@ After auto layout, CPI wrote this layout ([addffca]). Other coordinates are acce
 - Steps (100x60) and Start/End (32x32) sit in one row with the same center y: steps at `y=110`, Start/End at `y=124` (center y=140), 60 apart.
 - A sequenceFlow edge has two waypoints: the right edge of the source shape (x + width, center y) and the left edge of the target shape (x, center y). Example: a step at x=362 to a step at x=522 is `462,140` → `522,140`.
 
-Place a new shape in the row between its neighbors without overlapping them, **without moving existing shapes** if there is room: moved existing shapes may snap back (see above). In the default empty iFlow (Start x=292, End x=703, y=142), two steps fit at x=460 and x=590 (y=128, 100x60) ([3ef66d2], [6126bba]). If there is no room, you may still move the shapes after it to the right and fix the waypoints of every edge that touches a moved shape, but the designer may then show the steps crowded or overlapping. Tell the user they can fix the diagram with the designer's auto layout and Save ([4992e7a] → [addffca]); whether auto layout also fixes this snapped-back state is **unverified**.
+**Never move existing shapes.** Do not change the `Bounds` of any existing step, Start/End event, sender/receiver participant or the Integration Process pool, and do not widen the pool. Changes to existing coordinates did not stay: CPI put them back to its saved values in all 4 cases seen (see above), so moving them only makes the file differ from what CPI shows. That CPI always does this is an inference from those 4 cases. In one evaluation the shapes were moved anyway (step, End, Receiver and pool width shifted by 160, [83d2f85]); do not repeat that.
+
+Where to put a new step:
+
+1. In the free space in the row between its neighbors, without overlapping them. In the default empty iFlow (Start x=292, End x=703, y=142), two steps fit at x=460 and x=590 (y=128, 100x60) ([3ef66d2], [6126bba]).
+2. If the row has no room, somewhere else inside the pool where nothing is drawn, for example below the row. A new shape at x=580, y=200 was accepted and drawn there ([4992e7a]).
+3. If there is no free space at all, put it on top of existing shapes. Still move nothing. That an overlapping shape pulls and opens normally is **unverified**; tell the user.
+
+Write the waypoints of the new and re-targeted edges to the shapes they connect, as in "Inserting a step" below. After Pull, the diagram may look crowded or overlapping; the user can fix it with the designer's auto layout and Save ([4992e7a] → [addffca]). Whether auto layout fixes the snapped-back or overlapping state is **unverified**. Auto layout then Save creates changes in CPI that need a Push before the next local edit (see [workflow.md](workflow.md)), so suggest it only when the user cares about the diagram.
 
 ## Inserting a step between two nodes
 
@@ -127,14 +135,17 @@ Connecting an adapter in the UI added a `messageFlow` and its `BPMNEdge` with `s
 [03225bf]: https://github.com/miyasuta/cpi-iflow-samples/commit/03225bf
 [0c0adde]: https://github.com/miyasuta/cpi-iflow-samples/commit/0c0adde
 [0d5db9d]: https://github.com/miyasuta/cpi-iflow-samples/commit/0d5db9d
+[119da02]: https://github.com/miyasuta/cpi-iflow-samples/commit/119da02
 [395e94c]: https://github.com/miyasuta/cpi-iflow-samples/commit/395e94c
 [3ef66d2]: https://github.com/miyasuta/cpi-iflow-samples/commit/3ef66d2
 [40a9c8b]: https://github.com/miyasuta/cpi-iflow-samples/commit/40a9c8b
+[4125596]: https://github.com/miyasuta/cpi-iflow-samples/commit/4125596
 [4992e7a]: https://github.com/miyasuta/cpi-iflow-samples/commit/4992e7a
 [56e0a25]: https://github.com/miyasuta/cpi-iflow-samples/commit/56e0a25
 [57b3074]: https://github.com/miyasuta/cpi-iflow-samples/commit/57b3074
 [6126bba]: https://github.com/miyasuta/cpi-iflow-samples/commit/6126bba
 [669b621]: https://github.com/miyasuta/cpi-iflow-samples/commit/669b621
+[83d2f85]: https://github.com/miyasuta/cpi-iflow-samples/commit/83d2f85
 [92c8b77]: https://github.com/miyasuta/cpi-iflow-samples/commit/92c8b77
 [9d3de86]: https://github.com/miyasuta/cpi-iflow-samples/commit/9d3de86
 [addffca]: https://github.com/miyasuta/cpi-iflow-samples/commit/addffca
