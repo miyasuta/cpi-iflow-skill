@@ -183,7 +183,7 @@ Start from an iFlow that the user created empty in CPI and pushed (Sender, Start
 ```
 
 3. Do not create `parameters.prop` / `parameters.propdef`; CPI creates them on the first save ([79f6c66]).
-4. Run `check_iflw.py`, commit, push. In CPI: Pull → **Edit → Save** → Deploy → call. Both verified additions were saved in the designer before deployment; deploying a never-saved iFlow without Save is **unverified** (see [../workflow.md](../workflow.md)).
+4. Run `check_iflw.py`, commit, push. In CPI: Pull → **Edit → Save** → Deploy → call. Both verified additions were saved in the designer before deployment; deploying a never-saved iFlow without Save worked only once so far ([c3ddf1c], see [../workflow.md](../workflow.md)).
 5. The first save of an empty iFlow rewrites parts of the file (collaboration properties, participant keys, Start/End size 36x36 → 32x32). This appears in the next Push from CPI and is expected ([79f6c66], see [../workflow.md](../workflow.md) "An iFlow that was never saved in the designer").
 
 Results: the Address answered with HTTP 200 and, with only Start → End, returned the request body unchanged ([6e86930]). All 20 keys were unchanged after the Push from CPI ([79f6c66]).
@@ -218,5 +218,6 @@ When the user connects an HTTPS sender in the CPI UI, CSRF Protected is **on** b
 [9bf40a4]: https://github.com/miyasuta/cpi-iflow-samples/commit/9bf40a4
 [a3c03ec]: https://github.com/miyasuta/cpi-iflow-samples/commit/a3c03ec
 [bd394aa]: https://github.com/miyasuta/cpi-iflow-samples/commit/bd394aa
+[c3ddf1c]: https://github.com/miyasuta/cpi-iflow-samples/commit/c3ddf1c
 [ca0a3c9]: https://github.com/miyasuta/cpi-iflow-samples/commit/ca0a3c9
 [ce88aae]: https://github.com/miyasuta/cpi-iflow-samples/commit/ce88aae
