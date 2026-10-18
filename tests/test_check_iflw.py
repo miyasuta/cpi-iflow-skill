@@ -493,6 +493,79 @@ class OverlappingShapesTest(unittest.TestCase):
         self.assertEqual(warnings, [])
 
 
+class RequestReplyTest(unittest.TestCase):
+    """A Request Reply step (serviceTask) and the HTTP receiver message flow from it."""
+
+    # S05 built in the UI (receiver Participant_7, unused Participant_2 left over);
+    # X05 written locally and connected to the existing Participant_2 (L-1), then
+    # with a changed Address and Query (L-2).
+    SAMPLES = ("s05_main_cc4ce46.iflw", "x05_exp_c3ddf1c.iflw", "x05_exp_1b378b8.iflw")
+
+    def setUp(self):
+        self.base = read_fixture("x05_exp_1b378b8.iflw")
+
+    def corrupt(self, old, new):
+        self.assertIn(old, self.base)
+        return check_text(self.base.replace(old, new, 1))
+
+    def test_request_reply_samples_should_have_no_errors_or_warnings(self):
+        for name in self.SAMPLES:
+            with self.subTest(name=name):
+                self.assertEqual(check_iflw.check_file(fixture(name)), [])
+                self.assertEqual(check_iflw.find_warnings(fixture(name)), [])
+
+    def test_request_reply_step_without_shape_should_be_reported(self):
+        errors = self.corrupt('bpmnElement="ServiceTask_5" id="BPMNShape_ServiceTask_5"',
+                              'bpmnElement="ServiceTask_9" id="BPMNShape_ServiceTask_5"')
+        self.assertIn("node 'ServiceTask_5' has no BPMNShape", "\n".join(errors))
+
+    def test_request_reply_step_with_wrong_incoming_should_be_reported(self):
+        errors = self.corrupt("<bpmn2:incoming>SequenceFlow_3</bpmn2:incoming>\n"
+                              "            <bpmn2:outgoing>SequenceFlow_6",
+                              "<bpmn2:incoming>SequenceFlow_6</bpmn2:incoming>\n"
+                              "            <bpmn2:outgoing>SequenceFlow_6")
+        text = "\n".join(errors)
+        self.assertIn("ServiceTask_5", text)
+        self.assertIn("SequenceFlow_3", text)
+
+    def test_receiver_flow_from_unknown_step_should_be_reported(self):
+        errors = self.corrupt('sourceRef="ServiceTask_5" targetRef="Participant_2"',
+                              'sourceRef="ServiceTask_9" targetRef="Participant_2"')
+        self.assertIn("messageFlow 'MessageFlow_8': sourceRef 'ServiceTask_9' does not exist",
+                      "\n".join(errors))
+
+    def test_receiver_flow_without_edge_should_be_reported(self):
+        errors = self.corrupt('bpmnElement="MessageFlow_8" id="BPMNEdge_MessageFlow_8"',
+                              'bpmnElement="MessageFlow_9" id="BPMNEdge_MessageFlow_8"')
+        self.assertIn("messageFlow 'MessageFlow_8' has no BPMNEdge", "\n".join(errors))
+
+    def test_receiver_edge_to_another_participant_should_be_reported(self):
+        # The receiver flow targets Participant_2; its edge must end at that participant's shape.
+        errors = self.corrupt('targetElement="BPMNShape_Participant_2"',
+                              'targetElement="BPMNShape_Participant_1"')
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("BPMNEdge_MessageFlow_8", errors[0])
+        self.assertIn("Participant_2", errors[0])
+
+    def test_receiver_overlapping_the_request_reply_step_should_warn(self):
+        # Move the receiver Participant_2 onto the Request Reply step.
+        old = '<dc:Bounds height="140.0" width="100.0" x="900.0" y="100.0"/>'
+        self.assertIn(old, self.base)
+        with tempfile.NamedTemporaryFile("w", suffix=".iflw", delete=False, encoding="utf-8") as f:
+            f.write(self.base.replace(old, '<dc:Bounds height="140.0" width="100.0" x="412.0" y="100.0"/>', 1))
+            path = f.name
+        try:
+            errors = check_iflw.check_file(path)
+            warnings = check_iflw.find_warnings(path)
+        finally:
+            os.unlink(path)
+        self.assertEqual(errors, [])
+        overlaps = [w for w in warnings if "overlap" in w]
+        self.assertEqual(len(overlaps), 1, warnings)
+        self.assertIn("BPMNShape_ServiceTask_5", overlaps[0])
+        self.assertIn("BPMNShape_Participant_2", overlaps[0])
+
+
 class CommandLineTest(unittest.TestCase):
     def run_script(self, *args):
         return subprocess.run(

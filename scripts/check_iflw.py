@@ -14,8 +14,11 @@ What it checks (see references/iflw-structure.md and references/escaping.md):
 - No id is used twice.
 - sequenceFlow sourceRef/targetRef exist in the same process and match the
   incoming/outgoing of the nodes (both directions).
-- messageFlow sourceRef/targetRef and participant processRef exist.
-- Every node in a process and every participant has exactly one BPMNShape;
+- messageFlow sourceRef/targetRef and participant processRef exist. A sender
+  flow goes from a participant to the start event; a receiver flow (HTTP
+  receiver) goes from a Request Reply step (serviceTask) to a participant.
+- Every node in a process (any element type, including the serviceTask of a
+  Request Reply step) and every participant has exactly one BPMNShape;
   every sequenceFlow and messageFlow has exactly one BPMNEdge.
 - Every BPMNShape/BPMNEdge points at an existing element; a BPMNEdge's
   sourceElement/targetElement are the shapes of the flow's sourceRef/targetRef.
