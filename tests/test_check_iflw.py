@@ -566,6 +566,73 @@ class RequestReplyTest(unittest.TestCase):
         self.assertIn("BPMNShape_Participant_2", overlaps[0])
 
 
+class ExceptionSubprocessTest(unittest.TestCase):
+    """Nodes, flows and shapes inside an Exception Subprocess (bpmn2:subProcess)."""
+
+    # S04 built in the UI; X04 written locally (experiment K-1).
+    SAMPLES = {"s04_main_f34d292": "S04_ExceptionSubprocess", "x04_exp_111453a": "X04_Sandbox"}
+
+    def corrupt(self, old, new):
+        """Edit a copy of the X04 sample and return (errors, warnings)."""
+        res = copy_iflow(self, "x04_exp_111453a", "X04_Sandbox")
+        iflw = os.path.join(res, "scenarioflows", "integrationflow", "X04_Sandbox.iflw")
+        edit_file(self, iflw, old, new)
+        return check_iflw.check_file(iflw), check_iflw.find_warnings(iflw)
+
+    def test_exception_subprocess_samples_should_have_no_errors_or_warnings(self):
+        for name, iflow in self.SAMPLES.items():
+            path = iflow_files(os.path.join(FIXTURES, name), iflow)[0]
+            with self.subTest(name=name):
+                self.assertEqual(check_iflw.check_file(path), [])
+                self.assertEqual(check_iflw.find_warnings(path), [])
+
+    def test_step_inside_subprocess_without_shape_should_be_reported(self):
+        errors, _ = self.corrupt('bpmnElement="CallActivity_Local2" id="BPMNShape_CallActivity_Local2"',
+                                 'bpmnElement="SubProcess_Local1" id="BPMNShape_CallActivity_Local2"')
+        self.assertIn("node 'CallActivity_Local2' has no BPMNShape", "\n".join(errors))
+
+    def test_flow_inside_subprocess_without_edge_should_be_reported(self):
+        errors, _ = self.corrupt('bpmnElement="SequenceFlow_Local3" id="BPMNEdge_SequenceFlow_Local3"',
+                                 'bpmnElement="SequenceFlow_Local2" id="BPMNEdge_SequenceFlow_Local3"')
+        self.assertIn("sequenceFlow 'SequenceFlow_Local3' has no BPMNEdge", "\n".join(errors))
+
+    def test_wrong_incoming_inside_subprocess_should_be_reported(self):
+        errors, _ = self.corrupt("<bpmn2:incoming>SequenceFlow_Local3</bpmn2:incoming>",
+                                 "<bpmn2:incoming>SequenceFlow_Local2</bpmn2:incoming>")
+        text = "\n".join(errors)
+        self.assertIn("EndEvent_Local1", text)
+        self.assertIn("SequenceFlow_Local3", text)
+
+    def test_flow_from_subprocess_to_main_flow_should_be_reported(self):
+        # The subprocess is not connected to the main flow; a flow inside it must stay inside it.
+        errors, _ = self.corrupt(
+            'id="SequenceFlow_Local3" sourceRef="CallActivity_Local2" targetRef="EndEvent_Local1"',
+            'id="SequenceFlow_Local3" sourceRef="CallActivity_Local2" targetRef="EndEvent_2"')
+        self.assertIn("sequenceFlow 'SequenceFlow_Local3': targetRef 'EndEvent_2' is in another process",
+                      "\n".join(errors))
+
+    def test_overlapping_shapes_inside_subprocess_should_warn(self):
+        # Put the Content Modifier onto the Error Start event.
+        errors, warnings = self.corrupt('<dc:Bounds height="60.0" width="100.0" x="431.0" y="206.0"/>',
+                                        '<dc:Bounds height="60.0" width="100.0" x="311.0" y="206.0"/>')
+        self.assertEqual(errors, [])
+        overlaps = [w for w in warnings if "overlap" in w]
+        self.assertEqual(len(overlaps), 1, warnings)
+        self.assertIn("BPMNShape_StartEvent_Local1", overlaps[0])
+        self.assertIn("BPMNShape_CallActivity_Local2", overlaps[0])
+
+    def test_subprocess_overlapping_a_main_flow_step_should_warn(self):
+        # Move the subprocess up onto the Groovy Script step of the main flow.
+        _, warnings = self.corrupt('<dc:Bounds height="80.0" width="400.0" x="290.0" y="196.0"/>',
+                                   '<dc:Bounds height="80.0" width="400.0" x="290.0" y="150.0"/>')
+        overlaps = [w for w in warnings if "overlap" in w]
+        self.assertTrue(any("BPMNShape_SubProcess_Local1" in w and "BPMNShape_CallActivity_Local1" in w
+                            for w in overlaps), warnings)
+        self.assertFalse([w for w in overlaps if "BPMNShape_SubProcess_Local1" in w
+                          and ("Local2" in w or "EndEvent_Local1" in w or "StartEvent_Local1" in w)],
+                         warnings)
+
+
 class CommandLineTest(unittest.TestCase):
     def run_script(self, *args):
         return subprocess.run(

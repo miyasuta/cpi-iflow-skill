@@ -13,12 +13,14 @@ What it checks (see references/iflw-structure.md and references/escaping.md):
 - The file is well-formed XML.
 - No id is used twice.
 - sequenceFlow sourceRef/targetRef exist in the same process and match the
-  incoming/outgoing of the nodes (both directions).
+  incoming/outgoing of the nodes (both directions). Nodes and flows inside an
+  Exception Subprocess (bpmn2:subProcess) are checked the same way; a flow
+  must stay inside its own subProcess.
 - messageFlow sourceRef/targetRef and participant processRef exist. A sender
   flow goes from a participant to the start event; a receiver flow (HTTP
   receiver) goes from a Request Reply step (serviceTask) to a participant.
-- Every node in a process (any element type, including the serviceTask of a
-  Request Reply step) and every participant has exactly one BPMNShape;
+- Every node in a process or subProcess (any element type, including the
+  serviceTask of a Request Reply step and the subProcess itself) and every participant has exactly one BPMNShape;
   every sequenceFlow and messageFlow has exactly one BPMNEdge.
 - Every BPMNShape/BPMNEdge points at an existing element; a BPMNEdge's
   sourceElement/targetElement are the shapes of the flow's sourceRef/targetRef.
@@ -52,7 +54,8 @@ Warnings (printed, but the exit code stays 0):
 - Two shapes of process nodes (steps, events) or sender/receiver participants
   overlap. CPI puts moved existing shapes back to their saved coordinates, so
   a new step placed where an existing shape used to be ends up hidden under it.
-  Shapes inside the Integration Process pool are not an overlap.
+  Shapes inside the Integration Process pool, and shapes of the nodes of an
+  Exception Subprocess inside that subProcess's shape, are not an overlap.
 
 Which bpmndi gaps actually make a Pull fail is not known, so every element is
 checked strictly. Uses the Python standard library only.
@@ -120,16 +123,7 @@ def check_file(path):
         else:
             by_id[el_id] = el
 
-    nodes = {}  # node id -> (element, process id)
-    seq_flows = []
-    for process in root.iter(q(BPMN2, "process")):
-        process_id = process.get("id")
-        for child in process:
-            if child.tag == q(BPMN2, "sequenceFlow"):
-                seq_flows.append((child, process_id))
-            elif child.tag not in NON_NODE_TAGS and child.get("id"):
-                nodes[child.get("id")] = (child, process_id)
-
+    nodes, seq_flows = flow_elements(root)
     errors += check_sequence_flows(nodes, seq_flows)
 
     message_flows = list(root.iter(q(BPMN2, "messageFlow")))
@@ -151,6 +145,32 @@ def check_file(path):
     return errors
 
 
+def flow_elements(root):
+    """Return (nodes, seq_flows) of every process and every subProcess in it.
+
+    nodes maps a node id to (element, container id); seq_flows is a list of
+    (sequenceFlow, container id). The container is the process or the
+    subProcess (Exception Subprocess) whose direct child the element is. A
+    subProcess is itself a node of its container.
+    """
+    nodes = {}
+    seq_flows = []
+
+    def walk(container):
+        container_id = container.get("id")
+        for child in container:
+            if child.tag == q(BPMN2, "sequenceFlow"):
+                seq_flows.append((child, container_id))
+            elif child.tag not in NON_NODE_TAGS and child.get("id"):
+                nodes[child.get("id")] = (child, container_id)
+                if child.tag == q(BPMN2, "subProcess"):
+                    walk(child)
+
+    for process in root.iter(q(BPMN2, "process")):
+        walk(process)
+    return nodes, seq_flows
+
+
 def check_sequence_flows(nodes, seq_flows):
     errors = []
     flow_by_id = {f.get("id"): f for f, _ in seq_flows}
@@ -163,7 +183,7 @@ def check_sequence_flows(nodes, seq_flows):
                 continue
             node, node_process = nodes[ref]
             if node_process != process_id:
-                errors.append("sequenceFlow '%s': %s '%s' is in another process" % (fid, attr, ref))
+                errors.append("sequenceFlow '%s': %s '%s' is in another process or subprocess" % (fid, attr, ref))
             listed = [c.text.strip() for c in node.findall(q(BPMN2, child_tag)) if c.text]
             if fid not in listed:
                 errors.append("node '%s' does not list sequenceFlow '%s' in <%s> (flow %s is '%s')" % (
@@ -327,23 +347,36 @@ def warn_waypoints(root):
 
 
 def warn_overlaps(root):
-    nodes = set()
-    for process in root.iter(q(BPMN2, "process")):
-        nodes |= {c.get("id") for c in process if c.tag not in NON_NODE_TAGS and c.get("id")}
+    flow_nodes, _ = flow_elements(root)
+    container = {n: c for n, (_, c) in flow_nodes.items()}
+    nodes = set(flow_nodes)
     # Sender and receiver participants; the Integration Process pool (processRef) contains the steps.
     nodes |= {p.get("id") for p in root.iter(q(BPMN2, "participant")) if p.get("processRef") is None}
+
+    def contains(outer, inner):
+        """True if node 'inner' lies inside subProcess 'outer' (at any depth)."""
+        c = container.get(inner)
+        while c is not None:
+            if c == outer:
+                return True
+            c = container.get(c)
+        return False
+
     shapes = []
     for shape in root.iter(q(BPMNDI, "BPMNShape")):
         if shape.get("bpmnElement") not in nodes:
             continue
         b = shape.find(q(DC, "Bounds"))
         try:
-            shapes.append((shape.get("id"), tuple(float(b.get(k)) for k in ("x", "y", "width", "height"))))
+            shapes.append((shape.get("id"), shape.get("bpmnElement"),
+                           tuple(float(b.get(k)) for k in ("x", "y", "width", "height"))))
         except (AttributeError, TypeError, ValueError):
             continue
     warnings = []
-    for i, (id_a, a) in enumerate(shapes):
-        for id_b, b in shapes[i + 1:]:
+    for i, (id_a, el_a, a) in enumerate(shapes):
+        for id_b, el_b, b in shapes[i + 1:]:
+            if contains(el_a, el_b) or contains(el_b, el_a):
+                continue
             if rects_overlap(a, b):
                 warnings.append("BPMNShape '%s' and '%s' overlap, so one hides the other in the designer. "
                                 "Place the new shape in free space; do not move existing shapes" % (id_a, id_b))
