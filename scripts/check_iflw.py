@@ -51,6 +51,10 @@ Warnings (printed, but the exit code stays 0):
   use as {{name}}.
 - A .groovy file in src/main/resources/script/ that no Groovy Script step
   names in 'script'.
+- An HTTP receiver message flow whose httpMethod or authenticationMethod has a
+  value that no sample has (see references/components/http-receiver.md), or
+  whose authenticationMethod is OAuth2 Client Credentials with an empty
+  credentialName.
 - Two shapes of process nodes (steps, events) or sender/receiver participants
   overlap. CPI puts moved existing shapes back to their saved coordinates, so
   a new step placed where an existing shape used to be ends up hidden under it.
@@ -87,6 +91,10 @@ SCRIPT_DIR = "script"
 
 PROP_FILE = "parameters.prop"
 PROPDEF_FILE = "parameters.propdef"
+
+# HTTP receiver values seen in real samples (references/components/http-receiver.md).
+HTTP_RECEIVER_METHODS = ("GET", "POST")
+HTTP_RECEIVER_AUTHENTICATIONS = ("None", "OAuth2 Client Credentials")
 
 # Children of a process that are not flow nodes.
 NON_NODE_TAGS = {
@@ -302,7 +310,8 @@ def find_warnings(path):
     except ET.ParseError:
         return []
     return (warn_tables(root) + warn_waypoints(root) + warn_overlaps(root)
-            + warn_parameters(path, root) + warn_scripts(path, root))
+            + warn_parameters(path, root) + warn_scripts(path, root)
+            + warn_http_receivers(root))
 
 
 def warn_tables(root):
@@ -556,6 +565,27 @@ def warn_scripts(iflw_path, root):
     used = {script for _, script in groovy_steps(root)}
     return ["script file '%s' in %s is not referenced by any Groovy Script step" % (f, script_dir)
             for f in sorted(os.listdir(script_dir)) if f.endswith(".groovy") and f not in used]
+
+
+def warn_http_receivers(root):
+    warnings = []
+    for mf in root.iter(q(BPMN2, "messageFlow")):
+        props = properties(mf)
+        if props.get("ComponentType") != "HTTP" or props.get("direction") != "Receiver":
+            continue
+        where = "HTTP receiver '%s'" % mf.get("id")
+        method = props.get("httpMethod", "")
+        if method not in HTTP_RECEIVER_METHODS:
+            warnings.append("%s: httpMethod '%s' is not in any sample (known: %s)"
+                            % (where, method, ", ".join(HTTP_RECEIVER_METHODS)))
+        auth = props.get("authenticationMethod", "")
+        if auth not in HTTP_RECEIVER_AUTHENTICATIONS:
+            warnings.append("%s: authenticationMethod '%s' is not in any sample (known: %s)"
+                            % (where, auth, ", ".join(HTTP_RECEIVER_AUTHENTICATIONS)))
+        elif auth == "OAuth2 Client Credentials" and not props.get("credentialName"):
+            warnings.append("%s: authenticationMethod is OAuth2 Client Credentials but credentialName "
+                            "is empty (write the name of the Security Material)" % where)
+    return warnings
 
 
 def find_iflw(paths):

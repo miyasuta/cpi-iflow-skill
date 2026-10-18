@@ -9,6 +9,7 @@ Commit hashes link to [miyasuta/cpi-iflow-samples](https://github.com/miyasuta/c
 | Task | Local edit |
 |---|---|
 | Insert a Request Reply step between two existing nodes and connect an HTTP receiver (GET, Authentication None) to the existing receiver participant | Verified once: written locally into an empty iFlow together with an HTTPS sender, pulled, deployed without Save, called ([c3ddf1c]). |
+| Call the receiver with POST or OAuth2 Client Credentials | Change the connected receiver as in [http-receiver.md](http-receiver.md) "Authentication" and "Method" (verified on an existing receiver; writing a new step with these values in one edit is **unverified**, so tell the user). |
 
 Request Reply with any adapter other than the HTTP receiver is not supported (no sample).
 

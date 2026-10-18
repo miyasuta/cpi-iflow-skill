@@ -566,6 +566,56 @@ class RequestReplyTest(unittest.TestCase):
         self.assertIn("BPMNShape_Participant_2", overlaps[0])
 
 
+class HttpReceiverSettingsTest(unittest.TestCase):
+    """Method, Authentication and Credential Name of an HTTP receiver message flow."""
+
+    # S05 changed in the UI to OAuth2 Client Credentials and POST; X05 changed
+    # locally to OAuth2 Client Credentials (N-1), then to POST (N-2).
+    SAMPLES = ("s05_main_5461d27.iflw", "x05_exp_ba66a4e.iflw", "x05_exp_5b2d746.iflw")
+
+    def setUp(self):
+        self.base = read_fixture("x05_exp_5b2d746.iflw")
+
+    def warnings_for(self, old, new):
+        self.assertIn(old, self.base)
+        with tempfile.NamedTemporaryFile("w", suffix=".iflw", delete=False, encoding="utf-8") as f:
+            f.write(self.base.replace(old, new, 1))
+            path = f.name
+        try:
+            self.assertEqual(check_iflw.check_file(path), [])
+            return check_iflw.find_warnings(path)
+        finally:
+            os.unlink(path)
+
+    def test_authentication_and_post_samples_should_have_no_errors_or_warnings(self):
+        for name in self.SAMPLES:
+            with self.subTest(name=name):
+                self.assertEqual(check_iflw.check_file(fixture(name)), [])
+                self.assertEqual(check_iflw.find_warnings(fixture(name)), [])
+
+    def test_authentication_value_not_in_samples_should_warn(self):
+        # The UI writes the display name with spaces; a guessed value must be caught.
+        warnings = self.warnings_for("<value>OAuth2 Client Credentials</value>",
+                                     "<value>OAuth2ClientCredentials</value>")
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("MessageFlow_8", warnings[0])
+        self.assertIn("authenticationMethod 'OAuth2ClientCredentials'", warnings[0])
+
+    def test_oauth2_client_credentials_without_credential_name_should_warn(self):
+        warnings = self.warnings_for("<value>s05-oauth-client</value>", "<value/>")
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("MessageFlow_8", warnings[0])
+        self.assertIn("credentialName", warnings[0])
+
+    def test_method_not_in_samples_should_warn(self):
+        warnings = self.warnings_for("<value>POST</value>", "<value>PUT</value>")
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("httpMethod 'PUT'", warnings[0])
+
+    def test_get_without_authentication_should_not_warn(self):
+        self.assertEqual(check_iflw.find_warnings(fixture("x05_exp_1b378b8.iflw")), [])
+
+
 class ExceptionSubprocessTest(unittest.TestCase):
     """Nodes, flows and shapes inside an Exception Subprocess (bpmn2:subProcess)."""
 
