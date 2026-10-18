@@ -29,8 +29,10 @@ Steps on the CPI side are done by the user in the CPI web UI. Ask the user to do
 
 1. **Before editing locally**, the user pushes every change saved in the CPI designer or the Configure screen. "Unpushed changes" means changes saved in CPI but not yet pushed.
 2. Edit the files locally, run `scripts/check_iflw.py`, commit, and push to the branch connected to the iFlow.
-3. In CPI: **Pull** → **Deploy** → wait for Started → call the iFlow to test it. Edit and Save are not needed: the user can deploy right after Pull, with the iFlow open in view mode ([21c75ae], [91b021b]). Opening the iFlow to look at the diagram is optional; if the deployment fails or the result is wrong, open it and check the Problems tab (a broken table value shows up only there, see "When Pull fails" below).
-4. A **Push from CPI is not needed**. The next local edit can start from the local commit: two local edits in a row, each pulled and deployed without a Push in between, both worked ([21c75ae] → [91b021b]).
+3. In CPI: **Pull** → **open the iFlow and check that the change arrived** → **Deploy** → wait for Started → call the iFlow to test it. Edit and Save are not needed: the user can deploy right after Pull, with the iFlow open in view mode ([21c75ae], [91b021b]).
+   - Before Deploy, the user opens the iFlow in the designer (view mode is enough) and checks that the steps and values you changed are there: a new step on the diagram, a changed header value, the Address. For a change only inside a script file, open the step's script. If the change is not there, Pull again, then check again. In one evaluation, Pull reported no error but the iFlow kept the previous content; the first deployment ran the old version, and a second Pull fixed it ([83d2f85], see "Pull" below). The cause is **unverified**.
+   - If the deployment fails or the result is wrong, check the Problems tab (a broken table value shows up only there, see "When Pull fails" below).
+4. A **Push from CPI is not needed**, and skipping it avoids the "behind" dead end (see "Push rejected: artifact is behind" below). The next local edit can start from the local commit: two local edits in a row, each pulled and deployed without a Push in between, both worked ([21c75ae] → [91b021b]).
 
 Why the Push can be skipped: even without Save, a Push from CPI is never empty. CPI rewrites the files in its own format (order of elements, waypoints, layout of `parameters.propdef`; see "Push" below) without changing keys, values, IDs or references ([0d5db9d]). The repository does not need that rewrite to continue.
 
@@ -50,6 +52,7 @@ Limits:
 | With unpushed UI changes, if the remote changed a **different place**, Pull merges: the remote change arrives and the UI changes stay. In the observed case, two different properties of the same Content Modifier (`headerTable` remotely, `wrapContent` in the UI) merged. The exact merge granularity (for example, different rows of the same table) is **unverified**. | [c200359] |
 | With unpushed UI changes, a remote change to the iFlow Description (`bpmn2:documentation`) is **not** taken over, and Pull still reports success. The next Push then overwrites the remote Description with the CPI value. | [24a9667], [c200359], [17f81ee] |
 | A successful Pull therefore does not prove that every remote change arrived. Check in the designer or in the diff of the next Push. | [24a9667] |
+| A Pull that reports no error may still leave the previous content in CPI. After a local commit ([83d2f85]) was pulled, the deployed iFlow behaved like the commit before it ([b7f7a59]); pulling again (no error) brought in the change. Whether the first Pull ran before the push arrived, or something else went wrong, is **unverified**. Always check in the designer before deploying. | [83d2f85] |
 | SAP documents only Push and Pull as Git operations. A UI action to resolve a conflict (for example, discarding the UI changes) is not documented; how to resolve one in practice is **unverified**. | [Using Git Operations](https://help.sap.com/docs/SAP_INTEGRATION_SUITE/9519789d5664487f8b9cd89eba514477/12347021da2f446b899aa2f780703c27.html?locale=en-US&state=PRODUCTION&version=CLOUD) |
 
 ### When Pull fails or the iFlow does not open cleanly
@@ -66,6 +69,22 @@ Limits:
 | After a merging Pull, Push creates a normal commit on top of the remote head containing both the remote and the UI changes. | [17f81ee] |
 | Pushing from CPI while the remote is ahead and has not been pulled: behavior is **unverified**. Always Pull before Push. | — |
 | A Push without any Edit or Save in CPI (Pull → Deploy only) still creates a commit. CPI rewrites the files: order of `bpmn2:sequenceFlow` and `BPMNEdge` elements, the end waypoint of a re-targeted edge (see below), line breaks and indentation of `parameters.propdef`, the final newline of `parameters.prop`, the `metainfo.prop` timestamp. Keys, values, IDs, references and `Bounds` stay the same. | [91b021b] → [0d5db9d] |
+
+### Push rejected: artifact is behind
+
+| Fact | Evidence |
+|---|---|
+| Other iFlows' commits ([b7f7a59], [83d2f85]) were pushed to the same branch. The user had pulled another iFlow, whose folder those commits did not touch (whether before or after those commits is unknown), did Edit → Save, and pushed from CPI. Push was rejected: `Your artifact is behind the latest commits on the <branch> branch. Pull the latest changes and update your artifact before push.` Pull then failed with `The pull operation cannot be performed as the content is already up to date.`, so neither Push nor Pull worked. | [4125596], [83d2f85] (messages reported by the user) |
+| That Pull compares only the iFlow's folder while Push compares the branch head is a guess; it fits what happened but was not tested. | — |
+| The dead end was resolved by committing the files **as CPI had saved them** into the iFlow's folder on the branch ([119da02]). After that, Pull worked, and a later Pull and Push from CPI worked too ([19e3402]). | [119da02], [19e3402] |
+
+How to avoid it: **do not Push from CPI** (the round trip above does not need it), and do not Edit → Save in CPI unless a step requires it. Then the iFlow in CPI never has its own changes to push.
+
+If a Push from CPI is needed after all (the user saved changes in the designer or the Configure screen) and it is rejected as "behind":
+
+1. Get the iFlow's files as CPI saved them. We did this with the OData API download (`GET /api/v1/IntegrationDesigntimeArtifacts(Id='<iFlow ID>',Version='active')/$value`), which returned the same files as a Push from CPI apart from timestamps ([c058b69]). A user without API access can probably use **Download** in the CPI UI (the package's Artifacts tab → Actions → Download; options "Default Values Only" and "Merged Configured and Default Values", see [Working with an Integration Package](https://help.sap.com/docs/CLOUD_INTEGRATION/368c481cd6954bdfa5d0435479fd4eaf/c433ce2a2bff4d9a9b69257583d1b2fe.html?locale=en-US&state=PRODUCTION&version=Cloud)). That the UI download gives the same files, and which option matches a Push, is **unverified**. If the iFlow has Configure values, tell the user this is unknown.
+2. The zip has no top folder. Replace the contents of `<iFlow>/` on the branch with the zip's contents (delete the old files first, so nothing stale is left), run `check_iflw.py`, commit and push.
+3. In CPI: Pull (it should no longer say "up to date"), then Push.
 
 ### Push fails: artifact is locked
 
@@ -133,8 +152,10 @@ Never write client secrets or tokens into the repository.
 [052b9b2]: https://github.com/miyasuta/cpi-iflow-samples/commit/052b9b2
 [0c0adde]: https://github.com/miyasuta/cpi-iflow-samples/commit/0c0adde
 [0d5db9d]: https://github.com/miyasuta/cpi-iflow-samples/commit/0d5db9d
+[119da02]: https://github.com/miyasuta/cpi-iflow-samples/commit/119da02
 [159c7c1]: https://github.com/miyasuta/cpi-iflow-samples/commit/159c7c1
 [17f81ee]: https://github.com/miyasuta/cpi-iflow-samples/commit/17f81ee
+[19e3402]: https://github.com/miyasuta/cpi-iflow-samples/commit/19e3402
 [1b5d158]: https://github.com/miyasuta/cpi-iflow-samples/commit/1b5d158
 [1ef9646]: https://github.com/miyasuta/cpi-iflow-samples/commit/1ef9646
 [21c75ae]: https://github.com/miyasuta/cpi-iflow-samples/commit/21c75ae
@@ -144,6 +165,7 @@ Never write client secrets or tokens into the repository.
 [3dbd8d9]: https://github.com/miyasuta/cpi-iflow-samples/commit/3dbd8d9
 [3ef66d2]: https://github.com/miyasuta/cpi-iflow-samples/commit/3ef66d2
 [40a9c8b]: https://github.com/miyasuta/cpi-iflow-samples/commit/40a9c8b
+[4125596]: https://github.com/miyasuta/cpi-iflow-samples/commit/4125596
 [4581ce0]: https://github.com/miyasuta/cpi-iflow-samples/commit/4581ce0
 [4992e7a]: https://github.com/miyasuta/cpi-iflow-samples/commit/4992e7a
 [519851d]: https://github.com/miyasuta/cpi-iflow-samples/commit/519851d
@@ -156,6 +178,7 @@ Never write client secrets or tokens into the repository.
 [7827ffc]: https://github.com/miyasuta/cpi-iflow-samples/commit/7827ffc
 [79f6c66]: https://github.com/miyasuta/cpi-iflow-samples/commit/79f6c66
 [834f0c6]: https://github.com/miyasuta/cpi-iflow-samples/commit/834f0c6
+[83d2f85]: https://github.com/miyasuta/cpi-iflow-samples/commit/83d2f85
 [91b021b]: https://github.com/miyasuta/cpi-iflow-samples/commit/91b021b
 [92c8b77]: https://github.com/miyasuta/cpi-iflow-samples/commit/92c8b77
 [95802b3]: https://github.com/miyasuta/cpi-iflow-samples/commit/95802b3
@@ -167,8 +190,10 @@ Never write client secrets or tokens into the repository.
 [a85e897]: https://github.com/miyasuta/cpi-iflow-samples/commit/a85e897
 [addffca]: https://github.com/miyasuta/cpi-iflow-samples/commit/addffca
 [af09698]: https://github.com/miyasuta/cpi-iflow-samples/commit/af09698
+[b7f7a59]: https://github.com/miyasuta/cpi-iflow-samples/commit/b7f7a59
 [bb5e4f0]: https://github.com/miyasuta/cpi-iflow-samples/commit/bb5e4f0
 [bd394aa]: https://github.com/miyasuta/cpi-iflow-samples/commit/bd394aa
+[c058b69]: https://github.com/miyasuta/cpi-iflow-samples/commit/c058b69
 [c200359]: https://github.com/miyasuta/cpi-iflow-samples/commit/c200359
 [c5b72ce]: https://github.com/miyasuta/cpi-iflow-samples/commit/c5b72ce
 [c6d9ca3]: https://github.com/miyasuta/cpi-iflow-samples/commit/c6d9ca3
