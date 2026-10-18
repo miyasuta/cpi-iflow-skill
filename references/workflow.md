@@ -39,7 +39,7 @@ Why the Push can be skipped: even without Save, a Push from CPI is never empty. 
 When the user did Edit and Save in CPI after all (or changed values in the Configure screen), those are unpushed changes: before the next local edit, close edit mode (**Cancel**), reload the page if the iFlow still shows as locked (see "Push fails: artifact is locked" below), **Push**, and pull locally (step 1).
 
 Limits:
-- Deploying without Save was verified on an iFlow that had been saved in the designer before ([79f6c66]). For an iFlow that was never saved in the designer (a new, empty iFlow that was only pushed once), deploying without Save worked once ([c3ddf1c], an empty iFlow with a locally added HTTPS sender, Request Reply and HTTP receiver deployed and answered as expected). One case is not enough to rely on: still ask the user to Save before Deploy in that case.
+- Deploying without Save was verified on an iFlow that had been saved in the designer before ([79f6c66]). For an iFlow that was never saved in the designer (a new, empty iFlow that was only pushed once), deploying without Save worked twice ([c3ddf1c]: an empty iFlow with a locally added HTTPS sender, Request Reply and HTTP receiver; [111453a]: an empty iFlow with a locally added HTTPS sender, Groovy Script and Exception Subprocess; both deployed and answered as expected). Two cases are not enough to rely on: still ask the user to Save before Deploy in that case.
 - The round trip with Save and a final Push (the earlier procedure) also completed for every supported kind of edit: adding header rows, inserting a Content Modifier, double-escaped values, adding a `headerTable` key, changing the HTTPS sender Address and CSRF setting ([c5b72ce], [addffca], [9898936], [bd394aa], [159c7c1], [3bff3be]).
 
 ## Pull
@@ -154,6 +154,7 @@ Never write client secrets or tokens into the repository.
 [052b9b2]: https://github.com/miyasuta/cpi-iflow-samples/commit/052b9b2
 [0c0adde]: https://github.com/miyasuta/cpi-iflow-samples/commit/0c0adde
 [0d5db9d]: https://github.com/miyasuta/cpi-iflow-samples/commit/0d5db9d
+[111453a]: https://github.com/miyasuta/cpi-iflow-samples/commit/111453a
 [119da02]: https://github.com/miyasuta/cpi-iflow-samples/commit/119da02
 [159c7c1]: https://github.com/miyasuta/cpi-iflow-samples/commit/159c7c1
 [17f81ee]: https://github.com/miyasuta/cpi-iflow-samples/commit/17f81ee

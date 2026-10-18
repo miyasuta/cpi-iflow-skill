@@ -21,6 +21,8 @@ bpmn2:definitions
 │   ├── bpmn2:startEvent  StartEvent_2
 │   ├── bpmn2:callActivity  CallActivity_5        a step, e.g. Content Modifier
 │   ├── bpmn2:serviceTask  ServiceTask_5          a Request Reply step
+│   ├── bpmn2:subProcess  SubProcess_5           an Exception Subprocess: not connected to the flow;
+│   │                                           its events, steps and sequenceFlows are its children
 │   ├── bpmn2:endEvent  EndEvent_2
 │   └── bpmn2:sequenceFlow  SequenceFlow_3, …     connections between nodes
 └── bpmndi:BPMNDiagram
