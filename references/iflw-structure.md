@@ -14,11 +14,13 @@ bpmn2:definitions
 │   ├── bpmn2:participant  Participant_1          ifl:type="EndpointSender"     (Sender)
 │   ├── bpmn2:participant  Participant_2          ifl:type="EndpointRecevier"   (Receiver)
 │   ├── bpmn2:participant  Participant_Process_1  ifl:type="IntegrationProcess" processRef="Process_1"
-│   └── bpmn2:messageFlow  MessageFlow_4          adapter (e.g. HTTPS sender)
+│   ├── bpmn2:messageFlow  MessageFlow_4          sender adapter (e.g. HTTPS sender): Participant_1 → StartEvent_2
+│   └── bpmn2:messageFlow  MessageFlow_8          receiver adapter (e.g. HTTP receiver): ServiceTask_5 → Participant_2
 ├── bpmn2:process  Process_1  name="Integration Process"
 │   ├── bpmn2:extensionElements    process-level ifl:property
 │   ├── bpmn2:startEvent  StartEvent_2
 │   ├── bpmn2:callActivity  CallActivity_5        a step, e.g. Content Modifier
+│   ├── bpmn2:serviceTask  ServiceTask_5          a Request Reply step
 │   ├── bpmn2:endEvent  EndEvent_2
 │   └── bpmn2:sequenceFlow  SequenceFlow_3, …     connections between nodes
 └── bpmndi:BPMNDiagram
@@ -35,6 +37,9 @@ bpmn2:definitions
 | `bpmn2:messageFlow` | An adapter is a `messageFlow` in the collaboration, not a step in the process. Example: `MessageFlow_4`, `name="HTTPS"`, `sourceRef="Participant_1"`, `targetRef="StartEvent_2"`. Settings are `ifl:property` ([components/https-sender.md](components/https-sender.md)). | [03225bf] |
 | `bpmn2:startEvent` / `bpmn2:endEvent` | `StartEvent_2` / `EndEvent_2` exist from the empty iFlow onward. Each has `bpmn2:outgoing` / `bpmn2:incoming` children and a `bpmn2:messageEventDefinition`. | [03225bf], [9d3de86] |
 | `bpmn2:callActivity` | A step such as a Content Modifier. Has `bpmn2:incoming` / `bpmn2:outgoing` children. Settings are `ifl:property` ([components/content-modifier.md](components/content-modifier.md)). | [9d3de86] |
+| `bpmn2:serviceTask` | A Request Reply step. Has `bpmn2:incoming` / `bpmn2:outgoing` children like a `callActivity`, and three `ifl:property` ([components/request-reply.md](components/request-reply.md)). | [f1a9ee9] |
+| `bpmn2:messageFlow` (receiver) | A receiver adapter is a `messageFlow` from a Request Reply step to a receiver participant. Example: `MessageFlow_8`, `name="HTTP"`, `sourceRef="ServiceTask_5"`, `targetRef="Participant_7"` ([components/http-receiver.md](components/http-receiver.md)). | [cc4ce46] |
+| Receiver participant | Every empty iFlow already has `Participant_2` (`name="Receiver"`) at x=900, y=100. A receiver adapter can target it ([c3ddf1c]); a participant placed in the UI has the single key `ifl:type` ([cc4ce46]). | [c3ddf1c], [cc4ce46] |
 | `bpmn2:sequenceFlow` | Connection between nodes in the process: `sourceRef` / `targetRef`. | [9d3de86] |
 | Step names | The UI numbers new steps (`Content Modifier 1`). A locally added step can have any name (`Added Locally`). | [9d3de86], [395e94c] |
 
@@ -66,11 +71,11 @@ Use IDs such as `CallActivity_Local1`, `SequenceFlow_Local1` for new elements an
 | Invalid coordinates (a shape at x=-500, y=5000; waypoints (0,0)→(0,0)) are not an error. The designer draws the step in its normal position and CPI rewrites the coordinates on save. Coordinates only need to be roughly right. | [fc352ae] → [0c0adde] |
 | Valid coordinates that differ from CPI's layout are not re-laid out when the designer saves (a new shape at x=580, y=200 stayed there). Seen in the designer; the saved file was not pushed before the layout was reformatted. | [4992e7a] |
 | The designer draws each line along its waypoints. A re-targeted edge whose waypoints still end at the old target is drawn to the old target, and the new step looks unconnected. Saving does not correct this. The iFlow still runs along the `sequenceFlow` references, so only the diagram is wrong. | [4992e7a] |
-| Coordinates of **existing** elements (same ID) changed locally came back as CPI's previously saved values in the next Push from CPI, even without any Save in CPI: the end waypoint of a re-targeted edge returned to its old end at the End event (`703.5`), and an End event moved from x=703 to x=730 returned to x=703. Coordinates of **new** shapes and edges kept the local values. References and the run were not affected. Seen 5 times: the 4th in files that CPI saved after Pull ([4125596] → [119da02]: the re-targeted edge went back to `323.5,158.0 → 703.5,158.0`), the 5th after [83d2f85], where every moved shape went back and hid the new step (see "Layout to imitate"). | [669b621], [0d5db9d], [c058b69], [119da02] |
+| Coordinates of **existing** elements (same ID) changed locally came back as CPI's previously saved values in the next Push from CPI, even without any Save in CPI: the end waypoint of a re-targeted edge returned to its old end at the End event (`703.5`), and an End event moved from x=703 to x=730 returned to x=703. Coordinates of **new** shapes and edges kept the local values. References and the run were not affected. Seen 6 times: the 6th in the API download after Pull of [c3ddf1c] (the re-targeted edge went back to `323.5,158 → 703.5,158`), the 4th in files that CPI saved after Pull ([4125596] → [119da02]: the re-targeted edge went back to `323.5,158.0 → 703.5,158.0`), the 5th after [83d2f85], where every moved shape went back and hid the new step (see "Layout to imitate"). | [669b621], [0d5db9d], [c058b69], [119da02], [c3ddf1c] |
 | That CPI already uses its saved coordinates for existing elements when it pulls is **unverified** (an inference): after the Pull in [6126bba], the designer drew the new step right next to the End event, as if End were still at x=703. | [6126bba], [c058b69] |
 | The designer's auto layout (format) fixes such a diagram. It rewrites every coordinate and the element order, but no key, value or reference. | [4992e7a] → [addffca] |
 | A `BPMNEdge` refers to **shape IDs** in `sourceElement` / `targetElement` (`BPMNShape_...`) and has two or more `di:waypoint` with `xsi:type="dc:Point"`. | [03225bf], [40a9c8b] |
-| Shape sizes written by CPI: step (`callActivity`) 100x60, Start/End 32x32, sender/receiver participants 100x140, the Integration Process participant 540x220 (in S01). | [9d3de86], [40a9c8b] |
+| Shape sizes written by CPI: step (`callActivity`, and the `serviceTask` of Request Reply in [f1a9ee9]) 100x60, Start/End 32x32, sender/receiver participants 100x140, the Integration Process participant 540x220 (in S01). | [9d3de86], [40a9c8b] |
 | The real files contain exactly this set: a shape for every process node and every participant, an edge for every sequenceFlow and messageFlow (`X01_Sandbox`: 7 shapes, 4 edges). | [40a9c8b] |
 
 ### Example (written locally in [395e94c], as saved by CPI in [57b3074])
@@ -92,7 +97,7 @@ After auto layout, CPI wrote this layout ([addffca]). Other coordinates are acce
 - Steps (100x60) and Start/End (32x32) sit in one row with the same center y: steps at `y=110`, Start/End at `y=124` (center y=140), 60 apart.
 - A sequenceFlow edge has two waypoints: the right edge of the source shape (x + width, center y) and the left edge of the target shape (x, center y). Example: a step at x=362 to a step at x=522 is `462,140` → `522,140`.
 
-**Never move existing shapes.** Do not change the `Bounds` of any existing step, Start/End event, sender/receiver participant or the Integration Process pool, and do not widen the pool. CPI puts existing coordinates back to its saved values (all 5 cases above), and that does harm: in one evaluation the existing step, End, Receiver and pool were moved 160 to the right and the new Groovy step was put at the old place of the moved step ([83d2f85]). After Pull, CPI had all existing shapes at their old coordinates and the new step at the written ones, so the new step lay exactly under the existing step and could not be seen in the designer (checked in CPI on 2026-10-18 after a second Pull: the API download of the iFlow had the existing step at x=682, End 842, Receiver 1018, pool width 708, and the new step also at x=682).
+**Never move existing shapes.** Do not change the `Bounds` of any existing step, Start/End event, sender/receiver participant or the Integration Process pool, and do not widen the pool. CPI puts existing coordinates back to its saved values (all 6 cases above), and that does harm: in one evaluation the existing step, End, Receiver and pool were moved 160 to the right and the new Groovy step was put at the old place of the moved step ([83d2f85]). After Pull, CPI had all existing shapes at their old coordinates and the new step at the written ones, so the new step lay exactly under the existing step and could not be seen in the designer (checked in CPI on 2026-10-18 after a second Pull: the API download of the iFlow had the existing step at x=682, End 842, Receiver 1018, pool width 708, and the new step also at x=682).
 
 Where to put a new step, without overlapping any existing shape:
 
@@ -124,12 +129,14 @@ The UI also updated existing waypoints and the end point of the sender message f
 
 Connecting an adapter in the UI added a `messageFlow` and its `BPMNEdge` with `sourceElement="BPMNShape_Participant_1"` and `targetElement="BPMNShape_StartEvent_2"` ([03225bf]).
 
+A Request Reply step is inserted the same way (the step element is a `serviceTask`), and its receiver adapter is a `messageFlow` with a `BPMNEdge` from the step's shape to the receiver participant's shape. Steps in [components/request-reply.md](components/request-reply.md) ([f1a9ee9], [cc4ce46], [c3ddf1c]).
+
 ## References that must be consistent
 
 `scripts/check_iflw.py` checks all of these. Whether each single inconsistency makes Pull fail is **unverified**, so all are treated as errors. It also prints a **warning** (exit code stays 0) when the waypoints of an edge do not reach its source or target shape, as in [4992e7a]. Fix the waypoints; the warning means the diagram will look wrong.
 
 - sequenceFlow `sourceRef` / `targetRef` ↔ the nodes' `outgoing` / `incoming`
-- messageFlow `sourceRef` / `targetRef` exist (participant / start event)
+- messageFlow `sourceRef` / `targetRef` exist (sender: participant → start event; receiver: Request Reply step → participant)
 - `BPMNShape` / `BPMNEdge` `bpmnElement` point at existing elements
 - `BPMNEdge` `sourceElement` / `targetElement` are the shapes of the flow's `sourceRef` / `targetRef`
 - No duplicate IDs
@@ -152,6 +159,9 @@ Connecting an adapter in the UI added a `messageFlow` and its `BPMNEdge` with `s
 [9d3de86]: https://github.com/miyasuta/cpi-iflow-samples/commit/9d3de86
 [addffca]: https://github.com/miyasuta/cpi-iflow-samples/commit/addffca
 [af09698]: https://github.com/miyasuta/cpi-iflow-samples/commit/af09698
+[f1a9ee9]: https://github.com/miyasuta/cpi-iflow-samples/commit/f1a9ee9
 [bb5e4f0]: https://github.com/miyasuta/cpi-iflow-samples/commit/bb5e4f0
 [c058b69]: https://github.com/miyasuta/cpi-iflow-samples/commit/c058b69
+[c3ddf1c]: https://github.com/miyasuta/cpi-iflow-samples/commit/c3ddf1c
+[cc4ce46]: https://github.com/miyasuta/cpi-iflow-samples/commit/cc4ce46
 [fc352ae]: https://github.com/miyasuta/cpi-iflow-samples/commit/fc352ae
