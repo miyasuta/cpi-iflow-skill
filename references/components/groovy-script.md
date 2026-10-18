@@ -111,8 +111,9 @@ So, when a script must read a request header, set `allowedHeaderList` to the hea
 </ifl:property>
 ```
 
-Changing `allowedHeaderList` **locally** is **unverified** (it was set in the UI). Tell the user, and ask them to check after Pull that the header is listed under Runtime Configuration → Allowed Header(s). SAP documents that the setting lists the headers retained while the incoming message is processed, as `|`-separated names without spaces or regular expressions, and warns against `*` ([Specify the Runtime Configuration](https://help.sap.com/docs/CLOUD_INTEGRATION/368c481cd6954bdfa5d0435479fd4eaf/0c1c96e50ff340869090469d260976f3.html?locale=en-US&state=PRODUCTION&version=Cloud)). Only a single name was tested; list only the headers the script needs, never `*`.
+Setting `allowedHeaderList` **locally** to a single name was verified once: pulled, deployed without Save, and the header reached a Router condition ([6ef7611]; not tested with a Groovy Script). SAP documents that the setting lists the headers retained while the incoming message is processed: names separated by `|` without spaces, **regular expressions are allowed** (for example `AB_[0-9]|CD_[0-9]`), and a single `*` allows all headers but is discouraged ([Specify the Runtime Configuration](https://help.sap.com/docs/CLOUD_INTEGRATION/368c481cd6954bdfa5d0435479fd4eaf/0c1c96e50ff340869090469d260976f3.html?locale=en-US&state=PRODUCTION&version=Cloud)). Only a single exact name was tested; `|`-separated lists and regular expressions are **unverified**, so tell the user when you write one. List only the headers the iFlow needs, never `*`.
 
+[6ef7611]: https://github.com/miyasuta/cpi-iflow-samples/commit/6ef7611
 [1a8d423]: https://github.com/miyasuta/cpi-iflow-samples/commit/1a8d423
 [4f27892]: https://github.com/miyasuta/cpi-iflow-samples/commit/4f27892
 [6126bba]: https://github.com/miyasuta/cpi-iflow-samples/commit/6126bba

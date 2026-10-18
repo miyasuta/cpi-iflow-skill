@@ -21,6 +21,8 @@ bpmn2:definitions
 │   ├── bpmn2:startEvent  StartEvent_2
 │   ├── bpmn2:callActivity  CallActivity_5        a step, e.g. Content Modifier
 │   ├── bpmn2:serviceTask  ServiceTask_5          a Request Reply step
+│   ├── bpmn2:exclusiveGateway  ExclusiveGateway_5  a Router; its routes are sequenceFlows,
+│   │                                           the default route is its 'default' attribute
 │   ├── bpmn2:subProcess  SubProcess_5           an Exception Subprocess: not connected to the flow;
 │   │                                           its events, steps and sequenceFlows are its children
 │   ├── bpmn2:endEvent  EndEvent_2
@@ -42,6 +44,7 @@ bpmn2:definitions
 | `bpmn2:serviceTask` | A Request Reply step. Has `bpmn2:incoming` / `bpmn2:outgoing` children like a `callActivity`, and three `ifl:property` ([components/request-reply.md](components/request-reply.md)). | [f1a9ee9] |
 | `bpmn2:messageFlow` (receiver) | A receiver adapter is a `messageFlow` from a Request Reply step to a receiver participant. Example: `MessageFlow_8`, `name="HTTP"`, `sourceRef="ServiceTask_5"`, `targetRef="Participant_7"` ([components/http-receiver.md](components/http-receiver.md)). | [cc4ce46] |
 | Receiver participant | Every empty iFlow already has `Participant_2` (`name="Receiver"`) at x=900, y=100. A receiver adapter can target it ([c3ddf1c]); a participant placed in the UI has the single key `ifl:type` ([cc4ce46]). | [c3ddf1c], [cc4ce46] |
+| `bpmn2:exclusiveGateway` | A Router. One `incoming`, one `outgoing` per route, four `ifl:property`, and a `default` attribute naming the default route. A route is a `sequenceFlow` leaving it, with a `bpmn2:conditionExpression` child unless it is the default ([components/router.md](components/router.md)). | [87baf40] |
 | `bpmn2:sequenceFlow` | Connection between nodes in the process: `sourceRef` / `targetRef`. | [9d3de86] |
 | Step names | The UI numbers new steps (`Content Modifier 1`). A locally added step can have any name (`Added Locally`). | [9d3de86], [395e94c] |
 
@@ -167,3 +170,4 @@ A Request Reply step is inserted the same way (the step element is a `serviceTas
 [c3ddf1c]: https://github.com/miyasuta/cpi-iflow-samples/commit/c3ddf1c
 [cc4ce46]: https://github.com/miyasuta/cpi-iflow-samples/commit/cc4ce46
 [fc352ae]: https://github.com/miyasuta/cpi-iflow-samples/commit/fc352ae
+[87baf40]: https://github.com/miyasuta/cpi-iflow-samples/commit/87baf40

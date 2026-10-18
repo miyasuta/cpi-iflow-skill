@@ -22,6 +22,8 @@ What it checks (see references/iflw-structure.md and references/escaping.md):
 - Every node in a process or subProcess (any element type, including the
   serviceTask of a Request Reply step and the subProcess itself) and every participant has exactly one BPMNShape;
   every sequenceFlow and messageFlow has exactly one BPMNEdge.
+- A Router (exclusiveGateway) with a 'default' attribute names one of the
+  sequenceFlows that leave it. See references/components/router.md.
 - Every BPMNShape/BPMNEdge points at an existing element; a BPMNEdge's
   sourceElement/targetElement are the shapes of the flow's sourceRef/targetRef.
 - headerTable/propertyTable/clientCertificates values, after the one level of
@@ -51,6 +53,10 @@ Warnings (printed, but the exit code stays 0):
   use as {{name}}.
 - A .groovy file in src/main/resources/script/ that no Groovy Script step
   names in 'script'.
+- A Router without a default route, a route of a Router that is not the
+  default and has no conditionExpression, or a default route that has one.
+  Every sample has exactly one default route without a condition; what CPI
+  does otherwise is unverified.
 - An HTTP receiver message flow whose httpMethod or authenticationMethod has a
   value that no sample has (see references/components/http-receiver.md), or
   whose authenticationMethod is OAuth2 Client Credentials with an empty
@@ -133,6 +139,7 @@ def check_file(path):
 
     nodes, seq_flows = flow_elements(root)
     errors += check_sequence_flows(nodes, seq_flows)
+    errors += check_routers(nodes, seq_flows)
 
     message_flows = list(root.iter(q(BPMN2, "messageFlow")))
     participants = list(root.iter(q(BPMN2, "participant")))
@@ -208,6 +215,23 @@ def check_sequence_flows(nodes, seq_flows):
                 if flow.get(attr) != node_id:
                     errors.append("node '%s': <%s> '%s' but that flow's %s is '%s'" % (
                         node_id, child_tag, ref, attr, flow.get(attr)))
+    return errors
+
+
+def routers(nodes, seq_flows):
+    """Yield (router element, [sequenceFlows leaving it]) for every exclusiveGateway."""
+    for node_id, (el, _) in sorted(nodes.items()):
+        if el.tag == q(BPMN2, "exclusiveGateway"):
+            yield el, [f for f, _ in seq_flows if f.get("sourceRef") == node_id]
+
+
+def check_routers(nodes, seq_flows):
+    errors = []
+    for gw, routes in routers(nodes, seq_flows):
+        default = gw.get("default")
+        if default is not None and default not in {f.get("id") for f in routes}:
+            errors.append("Router '%s': default '%s' is not a sequenceFlow that leaves the Router"
+                          % (gw.get("id"), default))
     return errors
 
 
@@ -311,7 +335,7 @@ def find_warnings(path):
         return []
     return (warn_tables(root) + warn_waypoints(root) + warn_overlaps(root)
             + warn_parameters(path, root) + warn_scripts(path, root)
-            + warn_http_receivers(root))
+            + warn_http_receivers(root) + warn_routers(root))
 
 
 def warn_tables(root):
@@ -565,6 +589,25 @@ def warn_scripts(iflw_path, root):
     used = {script for _, script in groovy_steps(root)}
     return ["script file '%s' in %s is not referenced by any Groovy Script step" % (f, script_dir)
             for f in sorted(os.listdir(script_dir)) if f.endswith(".groovy") and f not in used]
+
+
+def warn_routers(root):
+    nodes, seq_flows = flow_elements(root)
+    warnings = []
+    for gw, routes in routers(nodes, seq_flows):
+        default = gw.get("default")
+        if default is None:
+            warnings.append("Router '%s' has no default route (no 'default' attribute); every sample "
+                            "has one, and what happens when no condition matches is unverified" % gw.get("id"))
+        for f in routes:
+            has_condition = f.find(q(BPMN2, "conditionExpression")) is not None
+            if f.get("id") == default and has_condition:
+                warnings.append("Router '%s': default route '%s' has a conditionExpression (the samples "
+                                "have none on the default route)" % (gw.get("id"), f.get("id")))
+            elif f.get("id") != default and not has_condition:
+                warnings.append("Router '%s': route '%s' is not the default route and has no condition "
+                                "(conditionExpression)" % (gw.get("id"), f.get("id")))
+    return warnings
 
 
 def warn_http_receivers(root):

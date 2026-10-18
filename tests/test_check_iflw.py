@@ -616,6 +616,65 @@ class HttpReceiverSettingsTest(unittest.TestCase):
         self.assertEqual(check_iflw.find_warnings(fixture("x05_exp_1b378b8.iflw")), [])
 
 
+class RouterTest(unittest.TestCase):
+    """A Router (exclusiveGateway), its default route and the conditions of its routes."""
+
+    # S06 built in the UI; X07 written locally with two routes (M-1), then a third
+    # route without componentVersion and cmdVariantUri (M-2).
+    SAMPLES = ("s06_main_87baf40.iflw", "x07_exp_6ef7611.iflw", "x07_exp_45bac88.iflw")
+
+    def setUp(self):
+        self.base = read_fixture("x07_exp_45bac88.iflw")
+
+    def edited(self, old, new):
+        self.assertIn(old, self.base)
+        with tempfile.NamedTemporaryFile("w", suffix=".iflw", delete=False, encoding="utf-8") as f:
+            f.write(self.base.replace(old, new, 1))
+            path = f.name
+        try:
+            return check_iflw.check_file(path), check_iflw.find_warnings(path)
+        finally:
+            os.unlink(path)
+
+    def test_router_samples_should_have_no_errors_or_warnings(self):
+        for name in self.SAMPLES:
+            with self.subTest(name=name):
+                self.assertEqual(check_iflw.check_file(fixture(name)), [])
+                self.assertEqual(check_iflw.find_warnings(fixture(name)), [])
+
+    def test_default_naming_a_flow_that_does_not_leave_the_router_should_be_reported(self):
+        errors, _ = self.edited('default="SequenceFlow_11"', 'default="SequenceFlow_9"')
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("ExclusiveGateway_5", errors[0])
+        self.assertIn("SequenceFlow_9", errors[0])
+
+    def test_default_naming_an_unknown_flow_should_be_reported(self):
+        errors, _ = self.edited('default="SequenceFlow_11"', 'default="SequenceFlow_99"')
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("SequenceFlow_99", errors[0])
+
+    def test_route_without_condition_that_is_not_the_default_should_warn(self):
+        errors, warnings = self.edited(
+            "<bpmn2:conditionExpression id=\"FormalExpression_SequenceFlow_16_1792313248275\" "
+            "xsi:type=\"bpmn2:tFormalExpression\">${header.X-X07-Route} = 'b'</bpmn2:conditionExpression>", "")
+        self.assertEqual(errors, [])
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("SequenceFlow_16", warnings[0])
+        self.assertIn("condition", warnings[0])
+
+    def test_router_without_default_route_should_warn(self):
+        errors, warnings = self.edited('default="SequenceFlow_11" ', "")
+        self.assertEqual(errors, [])
+        self.assertTrue(any("ExclusiveGateway_5" in w and "default" in w for w in warnings), warnings)
+
+    def test_default_route_with_condition_should_warn(self):
+        errors, warnings = self.edited('default="SequenceFlow_11"', 'default="SequenceFlow_16"')
+        self.assertEqual(errors, [])
+        text = "\n".join(warnings)
+        self.assertIn("SequenceFlow_16", text)  # the default route has a condition
+        self.assertIn("SequenceFlow_11", text)  # a non-default route has no condition
+
+
 class ExceptionSubprocessTest(unittest.TestCase):
     """Nodes, flows and shapes inside an Exception Subprocess (bpmn2:subProcess)."""
 
