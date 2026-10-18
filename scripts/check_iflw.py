@@ -46,6 +46,10 @@ Warnings (printed, but the exit code stays 0):
   use as {{name}}.
 - A .groovy file in src/main/resources/script/ that no Groovy Script step
   names in 'script'.
+- Two shapes of process nodes (steps, events) or sender/receiver participants
+  overlap. CPI puts moved existing shapes back to their saved coordinates, so
+  a new step placed where an existing shape used to be ends up hidden under it.
+  Shapes inside the Integration Process pool are not an overlap.
 
 Which bpmndi gaps actually make a Pull fail is not known, so every element is
 checked strictly. Uses the Python standard library only.
@@ -274,8 +278,8 @@ def find_warnings(path):
         root = ET.parse(path).getroot()
     except ET.ParseError:
         return []
-    return (warn_tables(root) + warn_waypoints(root) + warn_parameters(path, root)
-            + warn_scripts(path, root))
+    return (warn_tables(root) + warn_waypoints(root) + warn_overlaps(root)
+            + warn_parameters(path, root) + warn_scripts(path, root))
 
 
 def warn_tables(root):
@@ -317,6 +321,36 @@ def warn_waypoints(root):
                                 "The designer draws the line along the waypoints; move them to the "
                                 "edges of the connected shapes" % (edge.get("id"), attr, edge.get(attr), gap))
     return warnings
+
+
+def warn_overlaps(root):
+    nodes = set()
+    for process in root.iter(q(BPMN2, "process")):
+        nodes |= {c.get("id") for c in process if c.tag not in NON_NODE_TAGS and c.get("id")}
+    # Sender and receiver participants; the Integration Process pool (processRef) contains the steps.
+    nodes |= {p.get("id") for p in root.iter(q(BPMN2, "participant")) if p.get("processRef") is None}
+    shapes = []
+    for shape in root.iter(q(BPMNDI, "BPMNShape")):
+        if shape.get("bpmnElement") not in nodes:
+            continue
+        b = shape.find(q(DC, "Bounds"))
+        try:
+            shapes.append((shape.get("id"), tuple(float(b.get(k)) for k in ("x", "y", "width", "height"))))
+        except (AttributeError, TypeError, ValueError):
+            continue
+    warnings = []
+    for i, (id_a, a) in enumerate(shapes):
+        for id_b, b in shapes[i + 1:]:
+            if rects_overlap(a, b):
+                warnings.append("BPMNShape '%s' and '%s' overlap, so one hides the other in the designer. "
+                                "Place the new shape in free space; do not move existing shapes" % (id_a, id_b))
+    return warnings
+
+
+def rects_overlap(a, b):
+    """True if two rectangles (x, y, width, height) share an area (touching edges do not count)."""
+    return (a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and
+            a[1] < b[1] + b[3] and b[1] < a[1] + a[3])
 
 
 def line_to_rect(points, rect):

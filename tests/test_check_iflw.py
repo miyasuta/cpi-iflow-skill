@@ -430,6 +430,69 @@ class GroovyScriptFileTest(unittest.TestCase):
         self.assertIn("script1.groovy", result.stdout)
 
 
+class OverlappingShapesTest(unittest.TestCase):
+    """Shapes of steps, events and sender/receiver must not overlap (warning only)."""
+
+    EVAL3 = os.path.join("x01_exp_83d2f85", "X01_Sandbox", "src", "main", "resources",
+                         "scenarioflows", "integrationflow", "S01_ContentModifier.iflw")
+
+    def test_real_samples_should_have_no_overlap_warnings(self):
+        paths = [fixture(n) for n in ("s01_main_92c8b77.iflw", "x01_exp_40a9c8b.iflw",
+                                      "x01_d1b_395e94c.iflw", "x01_eval2_4992e7a.iflw",
+                                      "x01_exp_3bff3be.iflw", "x01_exp_a3c03ec.iflw")]
+        paths += [iflow_files(os.path.join(FIXTURES, n), i)[0]
+                  for n, i in list(PARAM_FIXTURES.items()) + list(SCRIPT_FIXTURES.items())]
+        paths.append(fixture(self.EVAL3))
+        for path in paths:
+            with self.subTest(path=os.path.relpath(path, FIXTURES)):
+                warnings = check_iflw.find_warnings(path)
+                self.assertFalse([w for w in warnings if "overlap" in w], warnings)
+
+    def test_new_step_hidden_under_a_snapped_back_step_should_warn(self):
+        # Evaluation 3 (83d2f85) moved Set evalProp (CallActivity_Local2) from x=682 to 842
+        # and put the new Groovy Script 1 (CallActivity_Local3) at 682. CPI put the existing
+        # shapes back, so the new step lay exactly under Set evalProp and could not be seen.
+        res = copy_iflow(self, "x01_exp_83d2f85", "X01_Sandbox")
+        iflw = os.path.join(res, "scenarioflows", "integrationflow", "S01_ContentModifier.iflw")
+        edit_file(self, iflw,
+                  '<dc:Bounds height="60.0" width="100.0" x="842.0" y="110.0"/>',
+                  '<dc:Bounds height="60.0" width="100.0" x="682.0" y="110.0"/>')
+        self.assertEqual(check_iflw.check_file(iflw), [])
+        warnings = check_iflw.find_warnings(iflw)
+        overlaps = [w for w in warnings if "overlap" in w]
+        self.assertEqual(len(overlaps), 1, warnings)
+        self.assertIn("BPMNShape_CallActivity_Local2", overlaps[0])
+        self.assertIn("BPMNShape_CallActivity_Local3", overlaps[0])
+
+    def test_step_overlapping_end_event_should_warn(self):
+        base = read_fixture("x01_exp_40a9c8b.iflw")
+        old = 'bpmnElement="EndEvent_2" id="BPMNShape_EndEvent_2">'
+        self.assertIn(old, base)
+        # Put the End event inside the last step's shape.
+        import re
+        m = re.search(r'(bpmnElement="EndEvent_2" id="BPMNShape_EndEvent_2">\s*<dc:Bounds [^>]*/>)', base)
+        self.assertIsNotNone(m)
+        step = re.search(r'bpmnElement="CallActivity_Local1"[^>]*>\s*<dc:Bounds height="60.0" width="100.0" '
+                         r'x="([0-9.]+)" y="([0-9.]+)"/>', base)
+        self.assertIsNotNone(step)
+        moved = re.sub(r'x="[0-9.]+" y="[0-9.]+"', 'x="%s" y="%s"' % step.groups(), m.group(1))
+        with tempfile.NamedTemporaryFile("w", suffix=".iflw", delete=False, encoding="utf-8") as f:
+            f.write(base.replace(m.group(1), moved, 1))
+            path = f.name
+        try:
+            warnings = check_iflw.find_warnings(path)
+        finally:
+            os.unlink(path)
+        overlaps = [w for w in warnings if "overlap" in w]
+        self.assertEqual(len(overlaps), 1, warnings)
+        self.assertIn("BPMNShape_EndEvent_2", overlaps[0])
+
+    def test_shapes_inside_the_process_pool_should_not_warn(self):
+        # Every step lies inside Participant_Process_1; that is not an overlap.
+        warnings = check_iflw.find_warnings(fixture("s01_main_92c8b77.iflw"))
+        self.assertEqual(warnings, [])
+
+
 class CommandLineTest(unittest.TestCase):
     def run_script(self, *args):
         return subprocess.run(
