@@ -4,6 +4,8 @@ A Request Reply step calls an external receiver synchronously and continues with
 
 Commit hashes link to [miyasuta/cpi-iflow-samples](https://github.com/miyasuta/cpi-iflow-samples). Anything not confirmed is marked **unverified**.
 
+Names, roles, addresses and header names in the examples below show the XML shape only. They are not design choices; the design decides them ([../design/process.md](../design/process.md)).
+
 ## Supported in this skill version
 
 | Task | Local edit |

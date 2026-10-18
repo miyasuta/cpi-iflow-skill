@@ -4,6 +4,8 @@ A Content Modifier is a `bpmn2:callActivity` in the process, configured by `ifl:
 
 Commit hashes link to [miyasuta/cpi-iflow-samples](https://github.com/miyasuta/cpi-iflow-samples). Anything not confirmed is marked **unverified**.
 
+Names, roles, addresses and header names in the examples below show the XML shape only. They are not design choices; the design decides them ([../design/process.md](../design/process.md)).
+
 ## Supported in this skill version
 
 - Add, change, or reorder rows of Message Header (`headerTable`) and Exchange Property (`propertyTable`) with Type `constant` or `expression`
