@@ -4,7 +4,7 @@ The HTTP receiver adapter is the `bpmn2:messageFlow` in `bpmn2:collaboration` fr
 
 Commit hashes link to [miyasuta/cpi-iflow-samples](https://github.com/miyasuta/cpi-iflow-samples). Anything not confirmed is marked **unverified**.
 
-Names, roles, addresses and header names in the examples below show the XML shape only. They are not design choices; the design decides them ([../design/process.md](../design/process.md)).
+Names, roles, addresses and header names in the examples below show the XML shape only. They are not design choices; the approved design declaration or the user decides them ([../from-declaration.md](../from-declaration.md)).
 
 ## Supported in this skill version
 

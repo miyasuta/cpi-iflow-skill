@@ -4,7 +4,7 @@ A Groovy Script step is a `bpmn2:callActivity` in `bpmn2:process` with 7 `ifl:pr
 
 Commit hashes link to [miyasuta/cpi-iflow-samples](https://github.com/miyasuta/cpi-iflow-samples): `S02_GroovyScript` on `main` (built in the CPI UI) and `X02_Sandbox` on `exp` (edited locally). Anything not confirmed is marked **unverified**.
 
-Names, roles, addresses and header names in the examples below show the XML shape only. They are not design choices; the design decides them ([../design/process.md](../design/process.md)).
+Names, roles, addresses and header names in the examples below show the XML shape only. They are not design choices; the approved design declaration or the user decides them ([../from-declaration.md](../from-declaration.md)).
 
 ## Supported in this skill version
 
