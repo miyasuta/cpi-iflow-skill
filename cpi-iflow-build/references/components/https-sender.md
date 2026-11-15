@@ -22,13 +22,13 @@ All 20 keys below were part of iFlows that were deployed and called. Keep the ve
 | Adapter | (the adapter itself) | `system` | `Sender` |
 | Adapter | (the adapter itself) | `Name` | `HTTPS` |
 | Adapter | (the adapter itself) | `Description` | empty |
-| Connection > Address | a path starting with `/`, for example `/s01/content-modifier` | `urlPath` | the path |
-| Connection > CSRF Protected | not selected | `xsrfProtection` | `0` |
-| Connection > CSRF Protected | selected | `xsrfProtection` | `1` |
-| Connection > Authorization | User Role | `senderAuthType` | `RoleBased` |
-| Connection > User Role | `ESBMessaging.send` | `userRole` | `ESBMessaging.send` |
-| Connection > Client certificate table | none (User Role) | `clientCertificates` | empty, or one row of two empty cells: `<row><cell id='clientCertificate.subjectDN'></cell><cell id='clientCertificate.issuerDN'></cell></row>` (escaped once in the `.iflw`; both deployed) |
-| Connection > Maximum body size | the default | `maximumBodySize` | `40` |
+| Address | a path starting with `/`, for example `/s01/content-modifier` | `urlPath` | the path |
+| CSRF Protected | not selected | `xsrfProtection` | `0` |
+| CSRF Protected | selected | `xsrfProtection` | `1` |
+| Authorization | User Role | `senderAuthType` | `RoleBased` |
+| (no UI label recorded) | `ESBMessaging.send` | `userRole` | `ESBMessaging.send` |
+| Client Certificate Authorization table | none (User Role) | `clientCertificates` | empty, or one row of two empty cells: `<row><cell id='clientCertificate.subjectDN'></cell><cell id='clientCertificate.issuerDN'></cell></row>` (escaped once in the `.iflw`; both deployed) |
+| (no UI label recorded) | the default | `maximumBodySize` | `40` |
 
 ## Pitfalls
 

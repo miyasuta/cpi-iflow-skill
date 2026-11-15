@@ -22,34 +22,34 @@ All 48 keys below were part of iFlows that were deployed and called with Method 
 | Adapter | (the adapter itself) | `Name` | `HTTP` |
 | Adapter | (the adapter itself) | `Description` | empty |
 | Adapter | the receiver participant the flow points to | `system` | the `name` of that receiver participant, for example `Receiver` or `Northwind` |
-| Connection > Address | the full URL without the query string, for example `https://services.odata.org/V4/Northwind/Northwind.svc/Products(2)` | `httpAddressWithoutQuery` | the URL as it is (parentheses are not escaped) |
-| Connection > Query | `$select=ProductID,ProductName` | `httpAddressQuery` | the query without `?`, as it is (no URL encoding, no escaping) |
-| Connection > Query | empty | `httpAddressQuery` | empty |
-| Connection > Method | GET | `httpMethod` | `GET` |
-| Connection > Method | POST | `httpMethod` | `POST` |
-| Connection > Authentication | None | `authenticationMethod` | `None` |
-| Connection > Authentication | OAuth2 Client Credentials | `authenticationMethod` | `OAuth2 Client Credentials` (the display name, with spaces) |
-| Connection > Credential Name | none (Authentication None) | `credentialName` | empty |
-| Connection > Credential Name | OAuth2 Client Credentials | `credentialName` | the Name of an OAuth2 Client Credentials artifact in Security Material, for example `s05-oauth-client` |
-| Connection > Send Body | the default (for GET; hidden for POST) | `httpShouldSendBody` | `false` |
-| Connection > Timeout (ms) | the default | `httpRequestTimeout` | `60000` |
-| Connection > Request Headers | the default | `allowedRequestHeaders` | `traceparent` |
-| Connection > Response Headers | the default | `allowedResponseHeaders` | `*` |
-| Connection > Throw Exception on Failure | selected | `throwExceptionOnFailure` | `true` |
-| Connection > Proxy Type | Internet (default) | `proxyType` | `default` |
-| Connection > Retry | not selected (defaults) | `retryOnException` | `false` |
-| Connection > Retry | not selected (defaults) | `retryOnConnectionFailure` | `false` |
-| Connection > Retry | not selected (defaults) | `retryIteration` | `1` |
-| Connection > Retry | not selected (defaults) | `retryInterval` | `5` |
-| Adapter | the defaults | `streaming` | `false` |
-| Adapter | the defaults | `enableMPLAttachments` | `true` |
-| Adapter | the defaults | `pooledConnectionIdleTimeout` | `300000` |
-| Adapter | the defaults, left empty | `apiName`, `apiArtifactType`, `apiDisplayName`, `apiprovider_location_id`, `providerAuth`, `providerName`, `providerRelativeUrl`, `providerUrl`, `methodSourceExpression`, `privateKeyAlias`, `internetProxyType`, `proxyHost`, `proxyPort`, `locationID`, `httpErrorResponseCodes`, `retryOnExceptionsTable` | empty |
+| Address | the full URL without the query string, for example `https://services.odata.org/V4/Northwind/Northwind.svc/Products(2)` | `httpAddressWithoutQuery` | the URL as it is (parentheses are not escaped) |
+| Query | `$select=ProductID,ProductName` | `httpAddressQuery` | the query without `?`, as it is (no URL encoding, no escaping) |
+| Query | empty | `httpAddressQuery` | empty |
+| Method | GET | `httpMethod` | `GET` |
+| Method | POST | `httpMethod` | `POST` |
+| Authentication | None | `authenticationMethod` | `None` |
+| Authentication | OAuth2 Client Credentials | `authenticationMethod` | `OAuth2 Client Credentials` (the display name, with spaces) |
+| Credential Name | none (Authentication None) | `credentialName` | empty |
+| Credential Name | OAuth2 Client Credentials | `credentialName` | the Name of an OAuth2 Client Credentials artifact in Security Material, for example `s05-oauth-client` |
+| Send Body | the default (for GET; hidden for POST) | `httpShouldSendBody` | `false` |
+| Timeout in ms | the default | `httpRequestTimeout` | `60000` |
+| Request Headers | the default | `allowedRequestHeaders` | `traceparent` |
+| Response Headers | the default | `allowedResponseHeaders` | `*` |
+| Throw Exception on Failure | selected | `throwExceptionOnFailure` | `true` |
+| Proxy Type | Internet (default) | `proxyType` | `default` |
+| Retry tab (field label not recorded) | not selected (defaults) | `retryOnException` | `false` |
+| Retry tab (field label not recorded) | not selected (defaults) | `retryOnConnectionFailure` | `false` |
+| Retry tab (field label not recorded) | not selected (defaults) | `retryIteration` | `1` |
+| Retry tab (field label not recorded) | not selected (defaults) | `retryInterval` | `5` |
+| (no UI label recorded) | the default | `streaming` | `false` |
+| (no UI label recorded) | the default | `enableMPLAttachments` | `true` |
+| (no UI label recorded) | the default | `pooledConnectionIdleTimeout` | `300000` |
+| (no UI label recorded) | left empty | `apiName`, `apiArtifactType`, `apiDisplayName`, `apiprovider_location_id`, `providerAuth`, `providerName`, `providerRelativeUrl`, `providerUrl`, `methodSourceExpression`, `privateKeyAlias`, `internetProxyType`, `proxyHost`, `proxyPort`, `locationID`, `httpErrorResponseCodes`, `retryOnExceptionsTable` | empty |
 
 ## Pitfalls
 
 - The value of `authenticationMethod` for OAuth2 Client Credentials is the display name with spaces. The value `OAuth2ClientCredentials` (no spaces) was accepted when pushed, nothing warned about it, and the deployment then failed with a generation error that named no cause. With `OAuth2 Client Credentials` the deployment succeeded.
-- The Credential Name must be the Name of an OAuth2 Client Credentials artifact in Security Material. Ask the user for the name; never write a client ID, a secret or a token anywhere.
+- The Credential Name must be the Name of an OAuth2 Client Credentials artifact in Security Material (Monitor > Integrations and APIs > Security Material), already deployed. Ask the user for the name; never write a client ID, a secret or a token anywhere.
 - With Method GET the receiver got no body: it read an empty string, not `null`. With Method POST it got the current message body, and `httpShouldSendBody` stayed `false`.
 - A URL with parentheses, such as `Products(4)`, is written as it is. A Query with `$`, `=` and `,` is written as it is and reached the receiver.
 - To call another iFlow on the same tenant, the Address is `<runtime host>/http<Address of the target HTTPS sender>`. The runtime host is the `-rt` host, the one a client uses to call that iFlow. The target had User Role `ESBMessaging.send` and CSRF protection off, and the Credential was an OAuth2 Client Credentials artifact made from a service key whose role is `ESBMessaging.send`. That call succeeded.
