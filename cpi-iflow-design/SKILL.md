@@ -1,11 +1,11 @@
 ---
 name: cpi-iflow-design
-description: Use when the user describes what an SAP Cloud Integration (CPI) integration flow should achieve - what to receive or read, from which system, how to map or convert it, where to send it, how errors are handled - instead of exact steps, and the iFlow (or several iFlows that call each other) has to be designed first. Designs it along SAP's Integration Flow Design Guidelines (standard components before Groovy Script, error handling, ProcessDirect between iFlows, naming, externalized parameters, message log identifiers) and declares the design for approval - assumptions, flow table, reasons, externalized values, build order, open questions, and interfaces between iFlows. Writes no XML and needs no tenant or Git repository, so it also serves people who build iFlows only in the CPI designer.
+description: Use when the user describes what an SAP Cloud Integration (CPI) integration flow should achieve - what to receive or read, from which system, how to map or convert it, where to send it, how errors are handled - instead of exact steps, and the iFlow (or several iFlows that call each other) has to be designed first. Designs it along SAP's Integration Flow Design Guidelines (standard components before Groovy Script, error handling, ProcessDirect between iFlows, naming, externalized parameters, message log identifiers) and declares the design for approval - assumptions, flow table, reasons, externalized values, build order, open questions, and interfaces between iFlows. Writes no XML and needs no tenant or MCP server, so it also serves people who build iFlows only in the CPI designer.
 ---
 
 # CPI iFlow design
 
-Turn a goal into an iFlow design that follows SAP's integration flow design guidelines, declare it, and wait for the user's approval. This skill writes no XML, no script and no file, and needs neither a CPI tenant nor a Git repository.
+Turn a goal into an iFlow design that follows SAP's integration flow design guidelines, declare it, and wait for the user's approval. This skill writes no XML, no script and no file, and needs neither a CPI tenant nor an MCP server.
 
 The design is the one the guidelines call for. How the iFlow will be built (in the CPI designer, by a tool, by an AI) never changes it: a part that is hard to build is still declared as the guidelines recommend.
 
@@ -16,7 +16,7 @@ The design is the one the guidelines call for. How the iFlow will be built (in t
 3. **Check the guidelines** in [references/guidelines.md](references/guidelines.md): the A items shape the flow; the B items go into step names, section 3 and the identifier step.
 4. **Declare** in the format of [references/process.md](references/process.md), in the user's language. For several iFlows, add the Interface sections.
 5. **End your turn and wait for the user's explicit approval.** A question or a correction is not approval: revise and declare the whole design again.
-6. **After approval**, the declaration stays in the conversation as it is. To build it locally in a Cloud Integration Git Access repository, the user continues with the **cpi-iflow-build** skill, which takes the declaration as its input. To build it in the CPI designer, the user follows the flow table row by row.
+6. **After approval**, the declaration stays in the conversation as it is. To build it with an MCP server for Cloud Integration, the user continues with the **cpi-iflow-build** skill, which takes the declaration as its input. To build it in the CPI designer, the user follows the flow table row by row.
 
 ## Rules
 
