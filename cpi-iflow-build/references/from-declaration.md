@@ -30,6 +30,7 @@ For each row, list the settings it uses:
 Then decide the row:
 
 - **Every setting is in the references**: write it with those values, passed explicitly.
+- **A shape the references do not describe** (a step placement, routes joining an End, an end type not listed) is unknown too: mark the row unverified and name the shape.
 - **A setting is not in the references** (or the component has no file at all): follow "Unknown values" in [SKILL.md](../SKILL.md) for that setting. The rest of the row is still written from the references.
 - **"(existing)" rows**: leave them unchanged. Do not copy their settings into new steps unless the references show the same values.
 

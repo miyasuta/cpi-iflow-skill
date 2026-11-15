@@ -9,7 +9,7 @@ This skill is a **settings reference** for SAP Cloud Integration iFlows, plus th
 
 ## Rules
 
-- **Pass every setting explicitly, from the references.** Never rely on the MCP server's default values: a default may differ from the references, change with a new server version, or change when the server is replaced.
+- **Pass every setting explicitly, from the references.** This covers every setting the references list for the steps and adapters used, including the integration-flow settings they list; a setting the references do not cover is an unknown value. Never rely on the MCP server's default values: a default may differ from the references, change with a new server version, or change when the server is replaced.
 - **Never guess a value and push it.** A value that is not in the references goes through "Unknown values".
 - **Never write `.iflw` or other iFlow files by hand.** Writing goes through the MCP server only.
 - **Stop once before push** (Workflow step 5), even when a declaration was approved: approving a design is not approving the values written for it.
@@ -28,7 +28,7 @@ This skill is a **settings reference** for SAP Cloud Integration iFlows, plus th
 
 ## Unknown values
 
-A value is unknown when the references do not have it: a setting of a component with a file, or any setting of a component with no file. For each one:
+A value is unknown when the references do not have it: a setting of a component with a file, or any setting of a component with no file. A flow shape the references do not describe (for example a step placement, routes joining an End, or an end type not listed) is unknown too: flag it at the stop before push; it becomes verified only by a successful deployment. For each one:
 
 1. **References.** Look again, including the pitfalls of the component's file and related files.
 2. **SAP documentation.** Search it (with mcp-sap-docs if it is available) for the field and its possible values. Do not use the Neo environment documentation.

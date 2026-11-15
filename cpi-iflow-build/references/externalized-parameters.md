@@ -6,11 +6,11 @@ This file holds only the behavior that was confirmed by a successful deployment.
 
 ## Settings
 
-| Field | UI label | Key | Value |
+| UI field | UI choice | Key | Value |
 |---|---|---|---|
-| HTTPS sender Address | (no UI label recorded) | `urlPath` | `{{name}}`, for example `{{Address}}` |
-| Content Modifier header cell, `Value` column | (no UI label recorded) | `Value` cell of `headerTable` | `{{name}}`, for example `{{s03Greeting}}` |
-| Content Modifier body | (no UI label recorded) | `wrapContent` | `{{name}}`, for example `{{s03Body}}` |
+| HTTPS sender Address | Address | `urlPath` | `{{name}}`, for example `{{Address}}` |
+| Content Modifier header cell, `Value` column | (no UI choice recorded) | `Value` cell of `headerTable` | `{{name}}`, for example `{{s03Greeting}}` |
+| Content Modifier body | (no UI choice recorded) | `wrapContent` | `{{name}}`, for example `{{s03Body}}` |
 
 ## Behavior
 
@@ -26,7 +26,7 @@ This file holds only the behavior that was confirmed by a successful deployment.
 ## Pitfalls
 
 - Do not assume that changing a default value changes the behavior of an iFlow that already has configured values: a configured value is expected to take precedence (SAP documentation), and this case was not deployed. Ask whether values were configured, and tell the person that this case is not verified.
-- Do not put `{{name}}` inside a larger value (for example `/x/{{a}}`), and do not reuse one parameter in two fields. Neither was deployed.
-- Do not use special characters in a parameter value (`<`, `&`, `=`, `:`, `\`, line breaks). They were not deployed.
-- Do not externalize any field not listed in the Settings table.
+- Only the fields in the Settings table were deployed externalized. Any other field is an unknown value: follow "Unknown values" in [SKILL.md](../SKILL.md).
+- Only a whole field value replaced by `{{name}}` was deployed. `{{name}}` inside a larger value (for example `/x/{{a}}`) and one parameter reused in two fields were not deployed; they are unknown values too.
+- Parameter values with special characters (`<`, `&`, `=`, `:`, `\`, line breaks) were not deployed; they are unknown values too.
 - The designer may rewrite the parameter definitions when the iFlow is saved. This did not change the behavior of the deployed iFlow.

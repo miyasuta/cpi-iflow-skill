@@ -26,6 +26,7 @@ Fork the repository first (recommended): the references grow in your copy as you
 
 ```bash
 git clone https://github.com/<your-fork>/cpi-iflow-skill.git <path-to-clone>
+mkdir -p ~/.claude/skills
 ln -s <path-to-clone>/cpi-iflow-design ~/.claude/skills/cpi-iflow-design
 ln -s <path-to-clone>/cpi-iflow-build  ~/.claude/skills/cpi-iflow-build
 ```
@@ -51,6 +52,8 @@ An example is [cpi-saper-dev-mcp](https://github.com/devstylator/cpi-saper-dev-m
 - **Register it per project, with project scope** (`.mcp.json` in the project where you use it), not user-wide. Then the tools that can change a tenant are not available in every project.
 - Its configuration and service keys stay in that project's `.cpi/` folder, outside Git. Never commit them.
 - Its confirmation dialogs appear only in the terminal CLI (`claude`). In the Claude Desktop Code tab and in the VS Code extension they are not shown and are rejected, so there the server needs `unattendedTestMode: true`, limited with `allowedPackages`.
+
+The skill also uses mcp-sap-docs as an optional MCP server for the SAP documentation step of "Unknown values".
 
 Follow the server's own documentation for installing it and creating the service key.
 

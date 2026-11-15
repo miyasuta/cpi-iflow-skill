@@ -17,7 +17,7 @@ A Content Modifier sets Message Header rows, Exchange Property rows and the Mess
 
 A new step has exactly these 7 keys: `bodyType`, `propertyTable`, `headerTable`, `wrapContent`, `componentVersion`, `activityType`, `cmdVariantUri`. An empty table is an empty value.
 
-Older version pairs also deployed, and the two kinds of step can sit in one iFlow:
+Other version pairs also deployed, and the two kinds of step can sit in one iFlow:
 
 | UI field | UI choice | Key | Value |
 |---|---|---|---|
@@ -51,5 +51,5 @@ Both tables use the same row form. One row is six cells in this order, and sever
 - A header set in an earlier step is still there after later steps. With an HTTPS sender, headers set here came back as response headers with lower-case names (`x-s01-constant`).
 - Both a Constant and an Expression row deployed in `headerTable`, and an Expression row reading a header deployed in `propertyTable`. A Constant row in `propertyTable` deployed too.
 - Rows added to an existing table, and an empty table replaced by a table with rows, deployed. The row order in the value is the order shown in the designer.
-- A header value containing `<`, `&` or `>` is written escaped once as XML text inside its cell (`&lt;`, `&amp;`, `&gt;`). The table value is then escaped once more when stored, so the file holds `&amp;lt;` for `<`. In that form, `a<b & c>d` deployed and came back unchanged as a response header.
+- A header value containing `<`, `&` or `>` is written escaped once as XML text inside its cell (`&lt;`, `&amp;`, `&gt;`). The table value is escaped once more in the stored file (`&amp;lt;` for `<`); check the stored form in the diff. With that stored form, `a<b & c>d` deployed and came back unchanged as a response header.
 - A step with an older pair (`1.5` with `version::1.5.0`) kept its version when saved; CPI did not upgrade it. Keep an existing step's pair as it is, and use the 1.6 pair for a new step. A `1.5.0` step with only 5 keys (no `headerTable`, `propertyTable`) deployed, and so did adding a `headerTable` key to such a step (after `bodyType`, before `wrapContent`).
