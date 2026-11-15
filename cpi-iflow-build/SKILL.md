@@ -1,95 +1,82 @@
 ---
 name: cpi-iflow-build
-description: Use when editing an SAP Cloud Integration (CPI) integration flow locally in a Git repository connected through Cloud Integration Git Access - files such as <iFlow>/src/main/resources/scenarioflows/integrationflow/*.iflw, META-INF/MANIFEST.MF, metainfo.prop. Covers changing Content Modifier headers, exchange properties and message body, inserting a Content Modifier, inserting a Groovy Script step or changing its script (script/*.groovy), changing the iFlow Description, adding an HTTPS sender to an empty iFlow or changing its Address, CSRF and authorization settings, inserting a Request Reply step with an HTTP receiver or changing the receiver's Address, Query, Method (GET or POST) and Authentication (None or OAuth2 Client Credentials with a Credential Name, also for calling another iFlow on the same tenant), putting a Router after Start that routes on a request header value (a Content Modifier and End per route, a default route) or adding a route to it, setting Allowed Header(s), adding an Exception Subprocess that returns an error response (Error Start, Content Modifier, End Message) or changing the Content Modifier in it, and externalized parameters ({{name}}, parameters.prop, parameters.propdef). Also use to build an iFlow from a design declaration the user approved (from the cpi-iflow-design skill): it marks which rows it writes and which the user builds in the CPI designer, writes its part and hands the rest over; and when asked to add any other step or adapter to an iFlow in such a Git Access repository, or to create a new iFlow in it, so that unsupported parts are handed to the CPI designer instead of invented.
+description: Use when building or changing an SAP Cloud Integration (CPI) integration flow (iFlow) through an MCP server that can write, validate, push, deploy and call iFlows - requires the MCP server's iFlow editing tools; without them the skill only points to the setup. Covers HTTPS sender, Content Modifier (headers, exchange properties, body), Groovy Script, Router on a request header with Allowed Header(s), Request Reply with an HTTP receiver (GET or POST, None or OAuth2 Client Credentials), Exception Subprocess returning an error response, and externalized parameters. Also use to build an iFlow from a design declaration the user approved (from the cpi-iflow-design skill), and when a step, adapter or setting is not in the references yet, so that its value is found, verified by a deployment and added instead of guessed.
 ---
 
-# CPI iFlow local editing (v0)
+# CPI iFlow build
 
-Edit Cloud Integration iFlows as files, then let the user pull them into CPI. Every key, value and version this skill uses comes from real iFlows pushed from a CPI tenant ([cpi-iflow-samples](https://github.com/miyasuta/cpi-iflow-samples)). CPI accepts or rejects `.iflw` files in ways that are not documented, so **only write what the references show**.
-
-## Scope
-
-Supported:
-- Content Modifier: add, change or reorder Message Header and Exchange Property rows with Type `constant` or `expression`; set the Message Body
-- Insert a Content Modifier between two existing nodes
-- Change the iFlow Description
-- Add an HTTPS sender to an iFlow that has none (an empty iFlow created in CPI; verified with CSRF protection off, saved in CPI before deployment)
-- Change an existing HTTPS sender's Address or CSRF protection
-- Change an existing HTTPS sender's authorization (not yet verified for local edits; see the reference)
-- Groovy Script: one Groovy Script step per iFlow. Insert it with a new script file between two existing nodes (verified once, after a Content Modifier), and change the code of an existing script file (verified). Reading an HTTP request header in a script needs Allowed Header(s)
-- Allowed Header(s): set one header name locally (verified once, read by a Router; `|` lists and regular expressions are documented by SAP but unverified)
-- Router: put a Router directly after Start, with Non-XML conditions `${header.<name>} = '<value>'`, a Content Modifier and its own End on each route, and one default route (verified once, in an empty iFlow); add such a route to an existing Router (verified once)
-- Request Reply: insert a Request Reply step between two existing nodes and connect an HTTP receiver to the existing receiver participant, with Method GET and Authentication None (verified once, in an empty iFlow); change an existing HTTP receiver's Address or Query (verified)
-- HTTP receiver: change an existing one to Method POST (the message body is sent) or to Authentication OAuth2 Client Credentials with the name of a credential the user already deployed in Security Material, including calling another iFlow on the same tenant (each verified once)
-- Exception Subprocess: add one with Error Start → Content Modifier → End Message to an iFlow that has none, to return an error response (headers, body, HTTP status through `CamelHttpResponseCode`) (verified once, in an empty iFlow); change the Content Modifier inside an existing one (verified)
-- Externalized parameters: externalize the HTTPS sender Address or a Content Modifier header cell value as `{{name}}` with its default value (verified locally), or a Content Modifier body (same pattern, seen only in a UI sample); change the value of an existing parameter in `parameters.prop` (verified only for an iFlow with no values set in the Configure screen; otherwise tell the user it is unverified)
-
-Not supported (no real sample yet):
-- Any other step or adapter (JavaScript or other script types, receiver adapters other than HTTP, Splitter, Local Integration Process, Message Mapping, …)
-- Router: XML (XPath) conditions, other operators or properties in conditions, Throw Exception, routes that join one End or merge back, more than one step on a route, a Router anywhere but directly after Start
-- Exception Subprocess ending with Error End or Escalation End, any step inside it other than one Content Modifier, or more than one Exception Subprocess
-- HTTP receiver: any Method other than GET and POST, Send Body, any Authentication other than None and OAuth2 Client Credentials (Basic, client certificate, …), creating credentials, or any other setting (proxy, timeout, request headers, retry)
-- A second Groovy Script step in the same iFlow, a Groovy Script with a Script Collection (`scriptBundleId`), a function other than `processData` (`scriptFunction`), or a script file outside `src/main/resources/script/`
-- Other Content Modifier Source Types (Header, Property, XPath, Number Range, variables), `<` or `&` in a message body
-- Creating a new iFlow from scratch (`MANIFEST.MF`, `.project`, …) or changing component versions. A new iFlow starts empty in CPI: the user creates it there, connects it to the branch and pushes; then edit it locally
-- Externalizing any other field or part of a value, reusing, renaming or removing a parameter, special characters in a parameter value, or creating `parameters.prop` / `parameters.propdef` when the iFlow has none yet
-
-Never write the XML of anything outside Scope. How to handle it depends on the request:
-
-- **An approved design declaration** (from cpi-iflow-design): mark each part outside Scope as built by the user in the CPI designer ("UI"), following [references/from-declaration.md](references/from-declaration.md) (Workflow step 0). Never change the design to stay inside Scope.
-- **A goal without an approved declaration** (the user says what the iFlow should achieve, not which steps to use): do not design here; ask the user to design it first with cpi-iflow-design (Workflow step 0).
-- **A specific component at a specific place** that is outside Scope: tell the user that this skill has no verified sample for it, and offer two options: build that part in the CPI designer (then Push and continue locally), or add a sample for it first (make the change in the UI, one action per commit, and Push). Do the supported part of a mixed request only if the user agrees.
-
-## Workflow
-
-The user performs the CPI steps in the CPI web UI. Tell them exactly what to do and ask for the result.
-
-For a new iFlow, ask the user to create it empty in CPI (Sender, Start, End, Receiver), connect it to the branch and Push, then start at step 1. The skill never writes a new iFlow folder.
-
-0. **Plan from the request.**
-   - **An approved declaration** from cpi-iflow-design is in the conversation: follow [references/from-declaration.md](references/from-declaration.md). Mark every flow table row as Skill, UI or Skill (unverified), show the marked table and the build plan, then **end your turn and wait for the user's explicit approval. Before approval, do not write or change any file, do not commit, do not push.**
-   - **A goal, or steps whose kind or position the user left open, and no approved declaration**: do not design them here. Tell the user to design the iFlow first with the cpi-iflow-design skill (or to paste an approved declaration), and stop.
-   - **Changes to values of existing steps, or a single step whose component and position the user gave**: go on to step 1. If that step is an obvious anti-pattern (a Groovy Script for what a standard step does, such as mapping or format conversion; calling an iFlow on the same tenant over HTTP instead of ProcessDirect), say so in one or two sentences before writing, name the standard component, and let the user decide.
-1. **Start clean.** Ask the user to Push every change saved in CPI (designer or Configure screen), then pull the branch locally. Unpushed CPI changes cause Pull to be rejected when the same place changed, and a local Description change is silently dropped.
-2. **Edit locally.** Find the iFlow by `Bundle-Name` in `META-INF/MANIFEST.MF`, not by the `.iflw` file name.
-3. **Check:** `python3 scripts/check_iflw.py <iFlow folder>`. Fix every error before committing, and fix what each warning points to (edge waypoints, overlapping shapes, a `>` escaped only once, an unused parameter, an unreferenced `.groovy` file, an HTTP receiver value that no sample has, a Router route without a condition or a Router without a default route). For each `.iflw` it also reads `parameters.prop` and `parameters.propdef` from the iFlow's `src/main/resources/` folder (two levels above `scenarioflows/integrationflow/<name>.iflw`), so keep the Git Access layout: every `{{name}}` must be defined in both files, and every Groovy Script step's `script` file must exist in `src/main/resources/script/`.
-4. **Commit and push** to the branch connected to the iFlow.
-5. **In CPI:** Pull → open the iFlow (view mode is enough) and **check that your change is there** (the new step, the changed value, the edited script, the receiver's Address); if it is not, Pull again → Deploy (no Edit or Save needed) → wait for Started → call it and compare with the expected result. A Pull without errors once left the old content in CPI, and the old version was deployed (cause unverified). If the iFlow was never saved in the CPI designer, ask the user to Edit → Save before Deploy (deploying it without Save worked only twice so far). If the deployment fails or the result is wrong, ask the user to open the iFlow and check the Problems tab.
-6. **Do not Push from CPI.** The next local edit continues from your own commit. Pushing from CPI can end in a dead end when other iFlows on the branch changed: Push says the artifact is "behind" and Pull says "already up to date". Only if the user did Edit → Save or changed Configure values in CPI: close edit mode (Cancel), reload the page if the iFlow still shows as locked, Push, and pull locally before the next edit. If that Push is rejected as "behind", follow "Push rejected: artifact is behind" in [references/workflow.md](references/workflow.md).
-
-If Pull fails or the designer shows errors, see "When Pull fails" in [references/workflow.md](references/workflow.md).
+This skill is a **settings reference** for SAP Cloud Integration iFlows, plus the workflow to build with it through an MCP server. Every value in [references/](references/) was confirmed by a successful deployment: a value is in the references only if an iFlow deployed with it.
 
 ## Rules
 
-- Use only `ifl:property` keys, `cmdVariantUri` values and `componentVersion` values that appear in the references. If something is not there, stop and ask the user. Never invent keys, values or versions.
-- Copy only the **XML shape** from the samples and references, never their design choices. Sample step names (`Content Modifier 1`, `Added Locally`), the User Role `ESBMessaging.send`, calling another iFlow over HTTP, test addresses and header names are there to show the format; the approved declaration or the user decides names, roles and how things are called. Name each new step in English after its role (for example `setContentType`), never with a designer default. A property value that no sample shows (such as a custom User Role) is still not written: hand that setting to the UI.
-- Keep every existing step's version pair as it is. For a new Content Modifier, copy the 7-key template in [references/components/content-modifier.md](references/components/content-modifier.md); for a new Groovy Script step, the 7-key template in [references/components/groovy-script.md](references/components/groovy-script.md); for a new HTTPS sender, the 20-key message flow in [references/components/https-sender.md](references/components/https-sender.md); for a new Request Reply step, the 3-key service task in [references/components/request-reply.md](references/components/request-reply.md) and the 48-key HTTP receiver message flow in [references/components/http-receiver.md](references/components/http-receiver.md); for a new Exception Subprocess, the template in [references/components/exception-subprocess.md](references/components/exception-subprocess.md); for a new Router and its routes, the templates in [references/components/router.md](references/components/router.md). An older Content Modifier version pair already in the iFlow is fine; CPI accepts it and does not migrate it.
-- For every element you add or change, write its `bpmndi` `BPMNShape` (nodes, participants) or `BPMNEdge` (sequence and message flows) and keep all references consistent. Coordinates only need to be roughly right.
-- **Never move or resize existing shapes** (steps, Start/End, sender/receiver, the pool). CPI puts existing coordinates back after Pull, so a new step placed where a moved shape used to be ends up hidden under it. Put a new step where it overlaps nothing: free space between its neighbors, else below the row inside the pool (unverified how it is drawn). If it does not fit, still move nothing and ask the user to run the designer's auto layout after Pull. Fix every overlap warning from `check_iflw.py`. See "Layout to imitate" in [references/iflw-structure.md](references/iflw-structure.md).
-- When a flow gets a new source or target, also move its `di:waypoint` ends to the new shapes. The designer draws lines along the waypoints; changing only `sourceElement` / `targetElement` leaves the diagram wrong (the iFlow still runs).
-- Edit the iFlow Description in `bpmn2:documentation` in the `.iflw`. Never edit `metainfo.prop`: it has no effect and is overwritten by the next Push.
-- In `headerTable` / `propertyTable` cell values, escape `<`, `&`, `>` twice (`&amp;lt;`, `&amp;amp;`, `&amp;gt;`). Do not put `<` or `&` in a message body (`wrapContent`): unverified.
-- Remind the user to Pull in CPI before every Push from CPI. Pushing while the remote is ahead is unverified.
-- Leave everything not needed for the task unchanged. Do not "fix" diff noise such as the `bpmn2:documentation` id or timestamps.
-- Never write credentials (client secrets, tokens) into files or commits.
+- **Pass every setting explicitly, from the references.** Never rely on the MCP server's default values: a default may differ from the references, change with a new server version, or change when the server is replaced.
+- **Never guess a value and push it.** A value that is not in the references goes through "Unknown values".
+- **Never write `.iflw` or other iFlow files by hand.** Writing goes through the MCP server only.
+- **Stop once before push** (Workflow step 5), even when a declaration was approved: approving a design is not approving the values written for it.
+- Never write credentials (client secrets, tokens, passwords) anywhere. Write only the name of a credential the person deployed in Security Material.
+- Leave everything the task does not need unchanged.
+
+## Workflow
+
+1. **Check the prerequisite.** If no MCP tool for writing iFlows is available, tell the person to set up an MCP server as described in the setup section of the repository README (https://github.com/miyasuta/cpi-iflow-skill), and stop. Check also which of the capabilities in "Required MCP capabilities" the server has.
+2. **Take the input**: an approved design declaration from cpi-iflow-design (read [references/from-declaration.md](references/from-declaration.md)), or a request whose steps are already clear. A goal without steps goes to cpi-iflow-design first.
+3. **Read before writing**: the reference file of every component the iFlow uses, and [references/externalized-parameters.md](references/externalized-parameters.md) when something is externalized. List the settings each step needs; any setting not found goes through "Unknown values".
+4. **Write and validate.** Write through the MCP server, passing every value from the references. Run the validation and fix every error it reports before going on.
+5. **Stop before push.** Show a summary of the diff of what was written (without diff, the list of every value written, per step). Mark every place where an unknown (unverified) value was used, and say what it is. End your turn and wait for the person's explicit approval. A correction is not approval: fix, validate, and show the summary again.
+6. **Push, deploy, call.** After approval, push and deploy. If the deployment fails, report the error, fix the cause, and return to step 5. When it succeeds, call the iFlow to check that it does its job; for a declaration, use the test call its build order names.
+7. **Propose additions.** If a value that was not in the references deployed successfully, follow "Growing the references".
+
+## Unknown values
+
+A value is unknown when the references do not have it: a setting of a component with a file, or any setting of a component with no file. For each one:
+
+1. **References.** Look again, including the pitfalls of the component's file and related files.
+2. **SAP documentation.** Search it (with mcp-sap-docs if it is available) for the field and its possible values. Do not use the Neo environment documentation.
+3. **Designer.** If the documentation does not settle the exact key and value, ask the person to set that field once in the CPI designer and save the iFlow. Import the iFlow from the tenant and read the key and value from the diff. Without the import capability, this step is not available: ask the person for the value instead.
+4. **Write and stop.** Write the value and stop before push (Workflow step 5), naming the value as unknown and saying where it came from (documentation, designer, the person).
+5. **Deploy.** If the deployment succeeds, the value is verified: propose the addition ("Growing the references"). If it fails, the value is not verified: never add it to the references.
+
+Never invent a key or a value that none of these steps produced.
+
+## Growing the references
+
+After a deployment succeeds with a value that was not in the references, propose adding it. Do not add anything before the person agrees.
+
+- **Where**: the file of that component in `references/components/`. For a new component, a new file in the same form as the existing ones (a short description, a `## Settings` table, a `## Pitfalls` list). For an externalized field, [references/externalized-parameters.md](references/externalized-parameters.md).
+- **What**: one row in the Settings table (UI field, UI choice, key, value) and, only if something surprised you (a rejected form, a silent failure, a value that differs from what the designer shows), one pitfall. No dates, no commit hashes, no links to evidence: being in the references means it deployed.
+- **Only deployed values.** A value that was validated or pushed but not deployed, or that failed to deploy, is never added.
+- **After writing**: do no git operation (no commit, no branch, no push). Tell the person which files changed and that the changes are uncommitted; they commit them together later.
+
+## Required MCP capabilities
+
+The skill names roles, not tools. Examples are the tools of cpi-saper-dev-mcp.
+
+| Role | Needed | Example tool |
+|---|---|---|
+| Write (create and edit iFlows) | Required | `iflow_edit` |
+| Validate | Required | `iflow_validate` |
+| Push to the tenant | Required | |
+| Deploy | Required | |
+| Call the deployed iFlow | Required | |
+| Diff (what was written, compared with the tenant) | Optional | `iflow_diff` |
+| Import from the tenant | Optional | |
+
+- Without **diff**: at the stop before push, show the list of every value written, per step.
+- Without **import from the tenant**: step 3 of "Unknown values" (set it once in the designer) is not available; ask the person for the value.
+- Without any required role: say which one is missing and stop.
 
 ## References
 
-Read only what the task needs:
+Read only what the task needs.
 
 | Task | Read |
 |---|---|
-| Building from an approved declaration: who builds each row (Skill / UI / Skill (unverified)), what the skill can write per component, leaving room for UI steps, handing steps to the user, several iFlows | [references/from-declaration.md](references/from-declaration.md) |
-| Any task: round trip, Pull/Push behavior, conflicts, Description, diff noise, testing a deployed iFlow | [references/workflow.md](references/workflow.md) |
-| Adding or connecting elements, IDs, `bpmndi`, inserting a step | [references/iflw-structure.md](references/iflw-structure.md) |
-| Writing header, property or certificate table values, special characters | [references/escaping.md](references/escaping.md) |
-| Content Modifier keys, template, versions, rows, body | [references/components/content-modifier.md](references/components/content-modifier.md) |
-| HTTPS sender keys and settings, adding an HTTPS sender to an empty iFlow | [references/components/https-sender.md](references/components/https-sender.md) |
-| Groovy Script step template, script file, Allowed Header(s) (also for Router conditions) | [references/components/groovy-script.md](references/components/groovy-script.md) |
-| Request Reply step template, inserting it and connecting a receiver | [references/components/request-reply.md](references/components/request-reply.md) |
-| HTTP receiver keys, Address, Query, Method, Authentication and Credential Name, calling an iFlow on the same tenant, response headers | [references/components/http-receiver.md](references/components/http-receiver.md) |
-| Router template, routes, conditions, default route, Ends per route, layout | [references/components/router.md](references/components/router.md) |
-| Exception Subprocess template, error response, `CamelHttpResponseCode`, `${exception.message}` | [references/components/exception-subprocess.md](references/components/exception-subprocess.md) |
-| Externalized parameters: `{{name}}`, `parameters.prop`, `parameters.propdef`, Configure values | [references/externalized-parameters.md](references/externalized-parameters.md) |
-
-Facts marked **unverified** in the references were not tested. When a task depends on one, tell the user and ask them to check the result in CPI.
+| Building from an approved cpi-iflow-design declaration: reading it, deciding each row, showing unverified rows before push, several iFlows | [references/from-declaration.md](references/from-declaration.md) |
+| HTTPS sender: Address, CSRF protection, authorization | [references/components/https-sender.md](references/components/https-sender.md) |
+| Content Modifier: header and property rows, body, versions | [references/components/content-modifier.md](references/components/content-modifier.md) |
+| Groovy Script step and its script file; reading a request header | [references/components/groovy-script.md](references/components/groovy-script.md) |
+| Router: conditions on a header, default route, End per route, Allowed Header(s) | [references/components/router.md](references/components/router.md) |
+| Request Reply step | [references/components/request-reply.md](references/components/request-reply.md) |
+| HTTP receiver: Address, Query, Method, Authentication, Credential Name | [references/components/http-receiver.md](references/components/http-receiver.md) |
+| Exception Subprocess returning an error response | [references/components/exception-subprocess.md](references/components/exception-subprocess.md) |
+| Externalized parameters: which fields, default and configured values | [references/externalized-parameters.md](references/externalized-parameters.md) |
