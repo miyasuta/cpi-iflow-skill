@@ -5,7 +5,7 @@ Claude skills for SAP Cloud Integration (CPI) integration flows (iFlows). (Work 
 | Skill | What it does | Needs |
 |---|---|---|
 | [cpi-iflow-design](cpi-iflow-design/SKILL.md) | Turns a goal ("read the orders from A, map them, send them to B") into an iFlow design that follows SAP's Integration Flow Design Guidelines, and declares it for your approval. Writes no XML. | Nothing: no tenant, no MCP server. Also useful if you build iFlows only in the CPI designer. |
-| [cpi-iflow-build](cpi-iflow-build/SKILL.md) | Builds an iFlow through an MCP server: writes it with settings taken from a reference of values confirmed by a deployment, validates, stops for your approval, then pushes, deploys and calls it. Also builds an approved design from cpi-iflow-design. | An MCP server for Cloud Integration with the capabilities below. |
+| [cpi-iflow-build](cpi-iflow-build/SKILL.md) | Builds an iFlow through an MCP server: writes it with settings taken from a reference of values confirmed by a deployment and a call that worked, validates, stops for your approval, then pushes, deploys and calls it. Also builds an approved design from cpi-iflow-design. | An MCP server for Cloud Integration with the capabilities below. |
 
 ## Using them together
 
@@ -61,6 +61,6 @@ Follow the server's own documentation for installing it and creating the service
 
 The references of cpi-iflow-build are a settings reference that grows as you use it. When a step, adapter or setting is not in the references, the skill finds its value (SAP documentation, or a field you set once in the CPI designer), writes it, and stops for your approval before pushing. Then:
 
-- **Only values whose deployment succeeded are added.** A value that was validated or pushed but failed to deploy is never added.
+- **Only values that deployed and then worked when called are added.** A value that was validated or pushed but failed to deploy, or that deployed but whose call failed or gave a wrong result, is never added. A script can deploy and still fail at run time.
 - **The skill proposes, you approve.** It adds nothing before you agree: one row in the Settings table of the component's file, plus a pitfall only if something surprised it.
 - **The skill never commits.** It tells you which files changed. They stay uncommitted in your clone until you commit them together later (and, if you like, offer them upstream with a pull request).

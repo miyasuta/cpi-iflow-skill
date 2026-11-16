@@ -5,7 +5,7 @@ description: Use when building or changing an SAP Cloud Integration (CPI) integr
 
 # CPI iFlow build
 
-This skill is a **settings reference** for SAP Cloud Integration iFlows, plus the workflow to build with it through an MCP server. Every value in [references/](references/) was confirmed by a successful deployment: a value is in the references only if an iFlow deployed with it.
+This skill is a **settings reference** for SAP Cloud Integration iFlows, plus the workflow to build with it through an MCP server. Every value in [references/](references/) was confirmed by a successful deployment **and a call that did what the iFlow is meant to do**: a value is in the references only if an iFlow deployed with it and ran correctly. A deployment alone proves nothing about a script or an expression: it can deploy and still fail at run time.
 
 ## Rules
 
@@ -24,27 +24,27 @@ This skill is a **settings reference** for SAP Cloud Integration iFlows, plus th
 4. **Write and validate.** Write through the MCP server, passing every value from the references. Run the validation and fix every error it reports before going on.
 5. **Stop before push.** Show a summary of the diff of what was written (without diff, the list of every value written, per step). Mark every place where an unknown (unverified) value was used, and say what it is. End your turn and wait for the person's explicit approval. A correction is not approval: fix, validate, and show the summary again.
 6. **Push, deploy, call.** After approval, push and deploy. If the deployment fails, report the error, fix the cause, and return to step 5. When it succeeds, call the iFlow to check that it does its job; for a declaration, use the test call its build order names.
-7. **Propose additions.** If a value that was not in the references deployed successfully, follow "Growing the references".
+7. **Propose additions.** If a value that was not in the references deployed successfully and the call then worked as intended, follow "Growing the references".
 
 ## Unknown values
 
-A value is unknown when the references do not have it: a setting of a component with a file, or any setting of a component with no file. A flow shape the references do not describe (for example a step placement, routes joining an End, or an end type not listed) is unknown too: flag it at the stop before push; it becomes verified only by a successful deployment. For each one:
+A value is unknown when the references do not have it: a setting of a component with a file, or any setting of a component with no file. A flow shape the references do not describe (for example a step placement, routes joining an End, or an end type not listed) is unknown too: flag it at the stop before push; it becomes verified only by a successful deployment followed by a call that works. For each one:
 
 1. **References.** Look again, including the pitfalls of the component's file and related files.
 2. **SAP documentation.** Search it (with mcp-sap-docs if it is available) for the field and its possible values. Do not use the Neo environment documentation.
 3. **Designer.** If the documentation does not settle the exact key and value, ask the person to set that field once in the CPI designer and save the iFlow. Import the iFlow from the tenant and read the key and value from the diff. Without the import capability, this step is not available: ask the person for the value instead.
 4. **Write and stop.** Write the value and stop before push (Workflow step 5), naming the value as unknown and saying where it came from (documentation, designer, the person).
-5. **Deploy.** If the deployment succeeds, the value is verified: propose the addition ("Growing the references"). If it fails, the value is not verified: never add it to the references.
+5. **Deploy and call.** If the deployment succeeds and the call then does what the iFlow is meant to do (read the message log when it does not), the value is verified: propose the addition ("Growing the references"). If the deployment fails, or it succeeds but the call fails or gives a wrong result, the value is not verified: never add it to the references.
 
 Never invent a key or a value that none of these steps produced.
 
 ## Growing the references
 
-After a deployment succeeds with a value that was not in the references, propose adding it. Do not add anything before the person agrees.
+After a deployment succeeds and a call confirms that the iFlow works with a value that was not in the references, propose adding it. Do not add anything before the person agrees.
 
 - **Where**: the file of that component in `references/components/`. For a new component, a new file in the same form as the existing ones (a short description, a `## Settings` table, a `## Pitfalls` list). For an externalized field, [references/externalized-parameters.md](references/externalized-parameters.md).
-- **What**: one row in the Settings table (UI field, UI choice, key, value) and, only if something surprised you (a rejected form, a silent failure, a value that differs from what the designer shows), one pitfall. No dates, no commit hashes, no links to evidence: being in the references means it deployed.
-- **Only deployed values.** A value that was validated or pushed but not deployed, or that failed to deploy, is never added.
+- **What**: one row in the Settings table (UI field, UI choice, key, value) and, only if something surprised you (a rejected form, a silent failure, a value that differs from what the designer shows), one pitfall. No dates, no commit hashes, no links to evidence: being in the references means it deployed and ran correctly.
+- **Only values confirmed by a working call.** A value that was validated, pushed or deployed but whose call failed or gave a wrong result, or that was never called, is never added. A deployment that succeeds while the call fails (for example a script that does not compile) is worth a pitfall for the verified value, not a row for the failed one.
 - **After writing**: do no git operation (no commit, no branch, no push). Tell the person which files changed and that the changes are uncommitted; they commit them together later.
 
 ## Required MCP capabilities
