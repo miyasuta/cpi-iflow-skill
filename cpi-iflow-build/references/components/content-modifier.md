@@ -34,8 +34,12 @@ Both tables use the same row form. One row is six cells in this order, and sever
 | UI field | UI choice | Cell | Value |
 |---|---|---|---|
 | Action | Create | `Action` | `Create` |
+| Action | Delete | `Action` | `Delete`; `Name` is `$name=<header name>` (for example `$name=X-Drop`), `Type` `constant`, `Value` empty |
 | Source Type | Constant | `Type` | `constant` |
 | Source Type | Expression | `Type` | `expression` |
+| Source Type | Header | `Type` | `header`; `Value` is the name of the header to copy, `Datatype` empty |
+| Source Type | Property | `Type` | `property`; `Value` is the property name, `Datatype` empty |
+| Source Type | XPath | `Type` | `xpath`; `Value` is the XPath (for example `/r/t`), `Datatype` `java.lang.String` |
 | Source Value | the value | `Value` | the text; for Expression for example `${header.X-S01-Constant}` |
 | Data Type | Constant | `Datatype` | empty |
 | Data Type | Expression | `Datatype` | `java.lang.String` |
@@ -45,9 +49,13 @@ Both tables use the same row form. One row is six cells in this order, and sever
 ## Pitfalls
 
 - The body text is the value of `wrapContent` for both body types. There is no other body key.
-- Use `expression` for a body that contains `${header.<name>}` or `${property.<name>}`; they were resolved at runtime. A body of plain text with type `constant` also deployed.
+- Use `expression` for a body that contains `${header.<name>}` or `${property.<name>}`; they were resolved at runtime. With `constant`, `${header.X-In}` came back as literal text. A body of plain text with type `constant` also deployed.
 - A step with a non-empty body replaces the body. With two Content Modifiers in a row, the response body is the body of the later one.
 - A header or property set in a Content Modifier can be read in the body of the same step.
+- A Delete row whose `Name` is the plain header name (`X-Drop`) deployed, but at run time the whole step was skipped without any error: none of its rows or its body took effect, and the step was missing from the message log. With `$name=X-Drop`, the form the designer saves, the header was deleted.
+- Rows run from top to bottom. A later row's expression (`${header.X-First}`) read a header set by an earlier row of the same table.
+- A Property row in `headerTable` did not see a property set in `propertyTable` of the same step: the header was not created. A property set in an earlier step was read.
+- A Header row copying a header sent by the caller needs that name in Allowed Header(s) on the integration flow (see [https-sender.md](https-sender.md)); the copied `X-In` was listed there.
 - A header set in an earlier step is still there after later steps. With an HTTPS sender, headers set here came back as response headers with lower-case names (`x-s01-constant`).
 - Both a Constant and an Expression row deployed in `headerTable`, and an Expression row reading a header deployed in `propertyTable`. A Constant row in `propertyTable` deployed too.
 - Rows added to an existing table, and an empty table replaced by a table with rows, deployed. The row order in the value is the order shown in the designer.

@@ -12,7 +12,7 @@ A Groovy Script step runs a script file that belongs to the iFlow. The step name
 | Groovy Script | (the step itself) | `subActivityType` | `GroovyScript` |
 | (no UI label recorded) | the function to run | `scriptFunction` | empty; the function `processData` ran |
 | (no UI label recorded) | script collection | `scriptBundleId` | empty |
-| (no UI label recorded) | the script file | `script` | the file name only, for example `script1.groovy` (not `script/script1.groovy`) |
+| (no UI label recorded) | the script file | `script` | the file name only, for example `script1.groovy` or `AddHeader.groovy` (not `script/script1.groovy`) |
 
 ## Settings for step version 2.0.0 (Groovy 4)
 
@@ -57,7 +57,7 @@ Calls that deployed and ran: `message.getBody(String)`, `message.getHeaders().ge
 
 - The step needs its script file. Without a file named in `script`, the designer reports the error `Script File not defined for Script Processor step`. Every deployed Groovy Script step had its file in `script/`.
 - Define `processData` with exactly the signature above: `scriptFunction` is empty, and that function ran.
-- The script file was `script1.groovy` in every iFlow that deployed with this step version. Changing only the code of an existing file, with the step untouched, deployed and the new code ran.
+- A file name other than `script1.groovy` (`AddHeader.groovy`) deployed and ran. Changing only the code of an existing file, with the step untouched, deployed and the new code ran.
 - A header set earlier in the iFlow (for example by a Content Modifier) can be read in the script without any further setting.
 - A header sent by the caller cannot be read in the script unless its name is in Allowed Header(s) on the integration flow: while the list was empty, the script got its default value; with the name listed, it read the sent value. The header was then also returned in the response. See [router.md](router.md) for the key.
 - A script that throws an exception ends the main flow at that step. An Exception Subprocess catches it; see [exception-subprocess.md](exception-subprocess.md).
