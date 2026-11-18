@@ -4,19 +4,36 @@ When the user gives a goal ("receive orders from A, map them, send them to B") i
 
 Related: [guidelines.md](guidelines.md) (what a good design must respect), [components.md](components.md) (which standard component fits a purpose).
 
-## Waiting for approval
+## The design file
 
-- After the declaration, **end your turn**. Do not write any iFlow file, XML or script before the user approves.
-- Approval is an explicit yes to the declaration. A question or a correction is not approval: answer it, revise the declaration, show the whole flow table again, and wait again.
-- If something must change after approval (a step cannot work as declared, a new step is needed), declare the change and wait again.
+The declaration is written to one Markdown file in the user's project: `docs/<design name>.md`, where the design name is the iFlow name (B1 in [guidelines.md](guidelines.md)), or a name for the whole design when it spans several iFlows. Create `docs/` if it does not exist. If the file already exists, read it first: change it only when it holds this design; otherwise ask for another name.
+
+The file is the only file this skill writes. It never writes `.iflw` XML, scripts or other iFlow files.
+
+In the conversation, show the flow diagram, a short summary (what starts the iFlow, what it does, where it ends) and the file path. Do not paste the whole file into the conversation.
+
+## Presenting, questions, approval
+
+1. **Write the file and present it** as described above.
+2. **Ask the questions of section 5 one at a time.** Put the questions of all iFlows into one list; ask first those that change the flow. Ask one question per message, and with each question give:
+   - which iFlow and which rows it affects
+   - the options, and the one you recommend with its reason
+   If the client offers a way to ask the user a question with options, use it; otherwise ask in a normal message.
+3. **After each answer**, update the file: mark the question as answered and change the sections the answer affects. Show the diagram again only when the flow changed. Then ask the next question. A new question that comes up from an answer goes to the end of the list.
+4. **When no question is open**, ask for approval of the whole design, with the file path. A question or a correction is not approval: change the file, show the diagram again if the flow changed, and ask again.
+5. **End your turn after every question and every request for approval.** Do not build anything, and do not write any file other than the design file, before the user approves.
+
+If something must change after approval (a step cannot work as declared, a new step is needed), change the file, present the change, and wait for approval again.
 
 ## Declaration format
 
-The declaration is the contract between this skill and whoever builds the iFlow. The build skill **cpi-iflow-build** reads it from the conversation as it is (it is not saved to a file), so keep the headings, their order and the flow table columns exactly as below. Change this format only together with cpi-iflow-build.
+The design file is the contract between this skill and whoever builds the iFlow. The build skill **cpi-iflow-build** reads it, so keep the headings, their order and the flow table columns exactly as below. Change this format only together with cpi-iflow-build.
 
 Write the text in the user's language; keep the headings' numbers, step names and component names in English.
 
-```markdown
+````markdown
+# <design name>
+
 ## Design: <iFlow name, see "Naming conventions" in guidelines.md (B1)>
 
 ### 0. Assumptions
@@ -28,6 +45,10 @@ Write the text in the user's language; keep the headings' numbers, step names an
 Correct anything that is wrong before approving.
 
 ### 1. Flow
+```mermaid
+<flow diagram, see "Flow diagram" below>
+```
+
 | # | Step name | Component | Role |
 |---|---|---|---|
 | 1 | <role-based English name> | <component (+ adapter)> | <what it does> |
@@ -47,8 +68,9 @@ Correct anything that is wrong before approving.
 - <which part (or which iFlow) first, and the test call after each part>
 
 ### 5. Questions
-- <what could not be decided from the goal: retries, volume limits, delta or full load, …>
-```
+- Q1 (rows <#>): <question> — Open
+- Q2 (rows <#>): <question> — Answered: <the answer, and what it changed>
+````
 
 Rules for the flow table:
 
@@ -57,9 +79,28 @@ Rules for the flow table:
 - **Component**: the component and the settings that decide its shape (method, authentication type, end event type), because a builder needs them to know what the row is.
 - When the design changes an existing iFlow, list its existing steps too and end their Role with "(existing)".
 
+Rules for section 5:
+
+- Number the questions `Q1`, `Q2`, … across the whole file (all iFlows), so that each can be asked and answered on its own.
+- Each question ends with `Open` or `Answered: <answer>`. An approved design has no `Open` question.
+
+## Flow diagram
+
+The diagram shows the flow at a glance; the table holds what a builder needs. Both describe the same steps: when one changes, change the other.
+
+Write it as a Mermaid `flowchart LR`:
+
+- One node per table row. The node id is `s` plus the row number (`s3`, `sE1`); the label is the row number, the step name and the component without its settings, in double quotes: `s3["3 getSalesOrders<br/>Request Reply"]`.
+- Start and end events as circles: `s1(("1 Start (hourly)"))`. A Router as a diamond, with each route's condition on its edge: `s4{"4 routeByType<br/>Router"} -->|"type = A"| s5`.
+- Sender and receiver systems as their own nodes with the system name, `sys_s4{{"S/4HANA"}}`, joined to their step by a dotted edge with the adapter: `s3 -. "OData V2" .-> sys_s4`.
+- The Exception Subprocess as `subgraph E ["E handleError (Exception Subprocess)"]` holding its inner steps, not joined to the main flow.
+- A Local Integration Process as a subgraph too, joined to the Process Call step that calls it by a dotted edge.
+
+When the design spans several iFlows, add an overview diagram right below the file title, before the first `## Design:` section: one node per iFlow, and one edge per Interface section, labelled with the adapter and address.
+
 ## Several iFlows
 
-A design may span several iFlows (for example, to reuse a part or to call a common error handler). Write sections 0–5 for each iFlow, plus one **Interface** section for each connection between them:
+A design may span several iFlows (for example, to reuse a part or to call a common error handler). Write the overview diagram, sections 0–5 for each iFlow, plus one **Interface** section for each connection between them:
 
 ```markdown
 ### Interface: <caller> → <callee>
@@ -75,7 +116,11 @@ Build one iFlow at a time. Build the callee first, so the caller can be tested a
 
 Goal from the user: "Every hour, read the sales orders from S/4HANA through OData, turn them into JSON, and POST them to our order service's REST API."
 
-```markdown
+The file `docs/Global_SalesOrder_S4_to_OrderService.md`, as first written (before the questions are asked):
+
+````markdown
+# Global_SalesOrder_S4_to_OrderService
+
 ## Design: Global_SalesOrder_S4_to_OrderService
 
 ### 0. Assumptions
@@ -86,6 +131,22 @@ Goal from the user: "Every hour, read the sales orders from S/4HANA through ODat
 - Mapping: you provide the field list (S/4HANA field → order service field). No value mapping.
 
 ### 1. Flow
+```mermaid
+flowchart LR
+  s1(("1 Start (hourly)")) --> s2["2 setLogIdentifiers<br/>Content Modifier"]
+  s2 --> s3["3 getSalesOrders<br/>Request Reply"]
+  s3 --> s4["4 mapToOrderService<br/>Message Mapping"]
+  s4 --> s5["5 convertToJson<br/>XML to JSON Converter"]
+  s5 --> s6["6 setContentType<br/>Content Modifier"]
+  s6 --> s7["7 postOrders<br/>Request Reply"]
+  s7 --> s8(("8 End"))
+  s3 -. "OData V2" .-> sys_s4{{"S/4HANA"}}
+  s7 -. "HTTP POST" .-> sys_os{{"Order service"}}
+  subgraph E ["E handleError (Exception Subprocess)"]
+    sE1(("Error Start")) --> sE2(("Error End"))
+  end
+```
+
 | # | Step name | Component | Role |
 |---|---|---|---|
 | 1 | Start (hourly) | Timer start event | Starts a run every hour |
@@ -114,8 +175,16 @@ Goal from the user: "Every hour, read the sales orders from S/4HANA through ODat
 - First rows 2–7 with a manual start, and check the JSON that reaches the order service; then the timer (row 1) and row E.
 
 ### 5. Questions
-- Full load or only orders changed since the last run? Delta needs the last run time stored between runs (more steps).
-- Which value for SAP_ApplicationID? A run has many orders; I propose the run's start time.
-- Does the order service have an OpenAPI spec? Then Message Mapping can produce JSON directly and row 5 is dropped.
-- On failure, is "Failed in monitoring" enough, or do you need a retry or an alert?
+- Q1 (rows 1–3): Full load or only orders changed since the last run? Delta needs the last run time stored between runs (more steps). — Open
+- Q2 (rows 4–5): Does the order service have an OpenAPI spec? Then Message Mapping can produce JSON directly and row 5 is dropped. — Open
+- Q3 (row E): On failure, is "Failed in monitoring" enough, or do you need a retry or an alert? — Open
+- Q4 (row 2): Which value for SAP_ApplicationID? A run has many orders; I propose the run's start time. — Open
+````
+
+Then, in the conversation: the diagram, a two-line summary and the path, followed by the first question only:
+
+```markdown
+Q1 of 4 (Global_SalesOrder_S4_to_OrderService, rows 1–3): Full load every hour, or only the orders changed since the last run?
+- Full load (recommended for a start): no state between runs; the order service must accept orders it already has.
+- Delta: only changed orders; needs the last run time stored between runs, which adds steps before row 3.
 ```

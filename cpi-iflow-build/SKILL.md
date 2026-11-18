@@ -19,7 +19,7 @@ This skill is a **settings reference** for SAP Cloud Integration iFlows, plus th
 ## Workflow
 
 1. **Check the prerequisite.** If no MCP tool for writing iFlows is available, tell the person to set up an MCP server as described in the setup section of the repository README (https://github.com/miyasuta/cpi-iflow-skill), and stop. Check also which of the capabilities in "Required MCP capabilities" the server has.
-2. **Take the input**: an approved design declaration from cpi-iflow-design (read [references/from-declaration.md](references/from-declaration.md)), or a request whose steps are already clear. A goal without steps goes to cpi-iflow-design first.
+2. **Take the input**: an approved design file `docs/<design name>.md` from cpi-iflow-design (read [references/from-declaration.md](references/from-declaration.md)), or a request whose steps are already clear. A goal without steps goes to cpi-iflow-design first.
 3. **Read before writing**: the reference file of every component the iFlow uses, and [references/externalized-parameters.md](references/externalized-parameters.md) when something is externalized. List the settings each step needs; any setting not found goes through "Unknown values".
 4. **Write and validate.** Write through the MCP server, passing every value from the references. Run the validation and fix every error it reports before going on.
 5. **Stop before push.** Show a summary of the diff of what was written (without diff, the list of every value written, per step). Mark every place where an unknown (unverified) value was used, and say what it is. End your turn and wait for the person's explicit approval. A correction is not approval: fix, validate, and show the summary again.

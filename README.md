@@ -4,17 +4,17 @@ Claude skills for SAP Cloud Integration (CPI) integration flows (iFlows). (Work 
 
 | Skill | What it does | Needs |
 |---|---|---|
-| [cpi-iflow-design](cpi-iflow-design/SKILL.md) | Turns a goal ("read the orders from A, map them, send them to B") into an iFlow design that follows SAP's Integration Flow Design Guidelines, and declares it for your approval. Writes no XML. | Nothing: no tenant, no MCP server. Also useful if you build iFlows only in the CPI designer. |
+| [cpi-iflow-design](cpi-iflow-design/SKILL.md) | Turns a goal ("read the orders from A, map them, send them to B") into an iFlow design that follows SAP's Integration Flow Design Guidelines, writes it to `docs/<design name>.md` with a flow diagram, asks the open questions one at a time, and waits for your approval. Writes no XML. | Nothing: no tenant, no MCP server. Also useful if you build iFlows only in the CPI designer. |
 | [cpi-iflow-build](cpi-iflow-build/SKILL.md) | Builds an iFlow through an MCP server: writes it with settings taken from a reference of values confirmed by a deployment and a call that worked, validates, stops for your approval, then pushes, deploys and calls it. Also builds an approved design from cpi-iflow-design. | An MCP server for Cloud Integration with the capabilities below. |
 
 ## Using them together
 
-1. Tell Claude the goal. **cpi-iflow-design** declares the design: assumptions, flow table, why this shape, externalized values, build order, open questions (and the interfaces, when the design spans several iFlows).
-2. Review the declaration and approve it, or ask for changes.
-3. In the same conversation, ask to build it. **cpi-iflow-build** takes the approved declaration, looks up each row's settings in its references, and tells you about values it has not verified.
+1. Tell Claude the goal. **cpi-iflow-design** writes the design to `docs/<design name>.md` in your project: assumptions, a flow diagram (Mermaid) and flow table, why this shape, externalized values, build order, questions (and the interfaces, when the design spans several iFlows). In the conversation it shows the diagram and a short summary.
+2. It asks the open questions one at a time, with its recommendation, and updates the file after each answer. Then approve the design, or ask for changes.
+3. Ask to build it. **cpi-iflow-build** reads the approved design file, looks up each row's settings in its references, and tells you about values it has not verified.
 4. It writes and validates through the MCP server, then stops and shows what it wrote. After your approval it pushes, deploys and calls the iFlow.
 
-The declaration is handed over in the conversation, not as a file. Its format is the contract between the two skills: it is defined in [cpi-iflow-design/references/process.md](cpi-iflow-design/references/process.md) ("Declaration format"), and [cpi-iflow-build/references/from-declaration.md](cpi-iflow-build/references/from-declaration.md) relies on it. Change both together.
+The design is handed over as the file under `docs/`. Its format is the contract between the two skills: it is defined in [cpi-iflow-design/references/process.md](cpi-iflow-design/references/process.md) ("Declaration format"), and [cpi-iflow-build/references/from-declaration.md](cpi-iflow-build/references/from-declaration.md) relies on it. Change both together.
 
 For small edits to an existing iFlow (a header value, an Address, one Content Modifier at a given place), use cpi-iflow-build alone.
 
