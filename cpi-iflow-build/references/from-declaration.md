@@ -12,6 +12,7 @@ The format is defined in cpi-iflow-design ([../../cpi-iflow-design/references/pr
 - the flow table with columns `#`, `Step name`, `Component`, `Role`; rows `1`, `2`, … in message order; row `E` (and `E1`, `E2`, … for its inner steps) for the Exception Subprocess; "(existing)" at the end of the Role of steps the iFlow already has
 - adapters in the row of the step they belong to: the sender adapter with the Start row, a receiver adapter with its Request Reply row
 - the Component column naming the settings that decide a row's shape (method, authentication type, end event type)
+- Local Integration Processes: in the main table a `Process Call (→ L<n> <name>)` row; below it one table per process under `#### Local Integration Process L<n>: <name>`, with rows `L1.1`, `L1.2`, … and `L1.E` for its Exception Subprocess. Build each Local Integration Process with the name given, and point each Process Call to it
 - with several iFlows: sections 0–5 per iFlow and an `Interface: <caller> → <callee>` section per connection
 - section 5 with questions `Q1`, `Q2`, …, each ending with `Open` or `Answered: <answer>`
 

@@ -21,7 +21,7 @@ Main SAP sources: [Guidelines for Modifying Content](https://github.com/SAP-docs
 | Process the items of a message one by one | Splitter (and Gather) |
 | Encode, compress, encrypt | Encoder, Decoder, Encryptor |
 | Handle errors | Exception Subprocess |
-| Split one iFlow into parts | Local Integration Process + Process Call |
+| Keep the main flow short; group steps that serve one purpose | Local Integration Process + Process Call (when: [guidelines.md](guidelines.md), A7) |
 | Call another iFlow on the same tenant, synchronously | ProcessDirect (receiver in the caller, sender in the callee). Not the HTTP receiver ([guidelines.md](guidelines.md), A5). |
 | Call another iFlow asynchronously, retry later | JMS queue |
 | Values that change per landscape | Externalized parameters |

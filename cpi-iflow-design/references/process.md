@@ -55,6 +55,13 @@ Correct anything that is wrong before approving.
 | … | | | |
 | E | <name> | Exception Subprocess (<steps inside>) | <how errors end> |
 
+#### Local Integration Process L1: <name>
+| # | Step name | Component | Role |
+|---|---|---|---|
+| L1.1 | <role-based English name> | <component (+ adapter)> | <what it does> |
+| … | | | |
+| L1.E | <name> | Exception Subprocess (<steps inside>) | <how errors end> |
+
 ### 2. Why this shape
 - <component choice> — <guideline it follows, with link>
 - <for every Groovy Script: why no standard component does it>
@@ -79,6 +86,14 @@ Rules for the flow table:
 - **Component**: the component and the settings that decide its shape (method, authentication type, end event type), because a builder needs them to know what the row is.
 - When the design changes an existing iFlow, list its existing steps too and end their Role with "(existing)".
 
+Local Integration Processes (when to use them: [guidelines.md](guidelines.md), A7):
+
+- The main table holds the main Integration Process only. A Process Call is one row there; its Component names the process it calls: `Process Call (→ L1 enrichOrders)`.
+- Each Local Integration Process gets its own table under `#### Local Integration Process L<n>: <name>`, below the main table, numbered `L1`, `L2`, … in the order the main flow calls them. Its rows are `L1.1`, `L1.2`, …; its Exception Subprocess is `L1.E` (inner steps `L1.E1`, …).
+- A Local Integration Process has no start or end row of its own unless its end type matters: write an `Error End` row when it passes an error on to the main process on purpose.
+- Steps a Local Integration Process may not contain (another Local Integration Process, End Message, sender, receiver) never appear in its table ([guidelines.md](guidelines.md), A7).
+- Count the main table's rows before writing the file. With more than 7 steps (start event, end events and row E not counted), move a group of steps into a Local Integration Process, or say in "2. Why this shape" why the flow stays in one process.
+
 Rules for section 5:
 
 - Number the questions `Q1`, `Q2`, … across the whole file (all iFlows), so that each can be asked and answered on its own.
@@ -94,7 +109,7 @@ Write it as a Mermaid `flowchart LR`:
 - Start and end events as circles: `s1(("1 Start (hourly)"))`. A Router as a diamond, with each route's condition on its edge: `s4{"4 routeByType<br/>Router"} -->|"type = A"| s5`.
 - Sender and receiver systems as their own nodes with the system name, `sys_s4{{"S/4HANA"}}`, joined to their step by a dotted edge with the adapter: `s3 -. "OData V2" .-> sys_s4`.
 - The Exception Subprocess as `subgraph E ["E handleError (Exception Subprocess)"]` holding its inner steps, not joined to the main flow.
-- A Local Integration Process as a subgraph too, joined to the Process Call step that calls it by a dotted edge.
+- A Local Integration Process as a subgraph too, `subgraph L1 ["L1 enrichOrders (Local Integration Process)"]`, with node ids `sL1_1`, `sL1_2`, … and its own Exception Subprocess as a nested subgraph. Join the Process Call step to the subgraph by a dotted edge: `s3 -. "calls" .-> L1`. Write the subgraphs after the main flow's edges (see "Example with Local Integration Processes").
 
 When the design spans several iFlows, add an overview diagram right below the file title, before the first `## Design:` section: one node per iFlow, and one edge per Interface section, labelled with the adapter and address.
 
@@ -188,3 +203,70 @@ Q1 of 4 (Global_SalesOrder_S4_to_OrderService, rows 1–3): Full load every hour
 - Full load (recommended for a start): no state between runs; the order service must accept orders it already has.
 - Delta: only changed orders; needs the last run time stored between runs, which adds steps before row 3.
 ```
+
+### Example with Local Integration Processes
+
+Goal from the user: "Our web shop POSTs an order (XML) to CPI. Validate it, map it to the order service's JSON, POST it there, and reply to the shop with the order number in the shop's XML format, or with an error message."
+
+In one process the main flow would have 9 steps (validate, map, convert, set headers, post, convert back, map the response, …), more than 7 ([guidelines.md](guidelines.md), A7). Two groups have a purpose of their own: preparing the request and building the response. Section 1 of the file (the other sections as above):
+
+````markdown
+### 1. Flow
+```mermaid
+flowchart LR
+  s1(("1 Start")) --> s2["2 setLogIdentifiers<br/>Content Modifier"]
+  s2 --> s3["3 callPrepareOrder<br/>Process Call"]
+  s3 --> s4["4 postOrder<br/>Request Reply"]
+  s4 --> s5["5 callBuildResponse<br/>Process Call"]
+  s5 --> s6(("6 End"))
+  sys_shop{{"Web shop"}} -. "HTTPS" .-> s1
+  s4 -. "HTTP POST" .-> sys_os{{"Order service"}}
+  s3 -. "calls" .-> L1
+  s5 -. "calls" .-> L2
+  subgraph E ["E handleError (Exception Subprocess)"]
+    sE1(("Error Start")) --> sE2["setErrorResponse<br/>Content Modifier"] --> sE3(("End Message"))
+  end
+  subgraph L1 ["L1 prepareOrder (Local Integration Process)"]
+    sL1_1["L1.1 validateOrder<br/>XML Validator"] --> sL1_2["L1.2 mapToOrderService<br/>Message Mapping"]
+    sL1_2 --> sL1_3["L1.3 convertToJson<br/>XML to JSON Converter"]
+    sL1_3 --> sL1_4["L1.4 setRequestHeaders<br/>Content Modifier"]
+    subgraph L1E ["L1.E handleError"]
+      sL1_E1(("Error Start")) --> sL1_E2(("Error End"))
+    end
+  end
+  subgraph L2 ["L2 buildResponse (Local Integration Process)"]
+    sL2_1["L2.1 convertToXml<br/>JSON to XML Converter"] --> sL2_2["L2.2 mapToShopResponse<br/>Message Mapping"]
+    subgraph L2E ["L2.E handleError"]
+      sL2_E1(("Error Start")) --> sL2_E2(("Error End"))
+    end
+  end
+```
+
+| # | Step name | Component | Role |
+|---|---|---|---|
+| 1 | Start | Start event + HTTPS sender | Receives the order from the web shop |
+| 2 | setLogIdentifiers | Content Modifier | Sets SAP_Sender, SAP_Receiver, SAP_MessageType, SAP_ApplicationID (the shop's order ID) |
+| 3 | callPrepareOrder | Process Call (→ L1 prepareOrder) | Turns the shop order into the order service request |
+| 4 | postOrder | Request Reply + HTTP receiver (POST, OAuth2 Client Credentials) | Creates the order |
+| 5 | callBuildResponse | Process Call (→ L2 buildResponse) | Turns the reply into the shop's response |
+| 6 | End | End event | Replies to the web shop |
+| E | handleError | Exception Subprocess (Error Start → setErrorResponse → End Message) | Replies to the web shop with an error message |
+
+#### Local Integration Process L1: prepareOrder
+| # | Step name | Component | Role |
+|---|---|---|---|
+| L1.1 | validateOrder | XML Validator | Rejects an order that does not match the shop's XSD |
+| L1.2 | mapToOrderService | Message Mapping | Maps the shop order to the order service structure |
+| L1.3 | convertToJson | XML to JSON Converter | Changes the format only |
+| L1.4 | setRequestHeaders | Content Modifier | Sets Content-Type: application/json |
+| L1.E | handleError | Exception Subprocess (Error Start → Error End) | Passes the error on to row E of the main process |
+
+#### Local Integration Process L2: buildResponse
+| # | Step name | Component | Role |
+|---|---|---|---|
+| L2.1 | convertToXml | JSON to XML Converter | Changes the format only |
+| L2.2 | mapToShopResponse | Message Mapping | Maps the reply to the shop's response structure with the order number |
+| L2.E | handleError | Exception Subprocess (Error Start → Error End) | Passes the error on to row E of the main process |
+````
+
+The call to the order service (row 4) stays in the main process: whether a Request Reply inside a Local Integration Process may call a receiver is not confirmed yet ([guidelines.md](guidelines.md), A7). The reply to the shop (End, End Message) is in the main process because a Local Integration Process cannot contain an End Message.

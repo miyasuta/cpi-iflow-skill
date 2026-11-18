@@ -44,8 +44,16 @@ Three groups, by when they apply:
 
 ### A7. How the processing is divided
 - Group related logic: a Local Integration Process inside one iFlow, or a separate iFlow called through ProcessDirect when the part is reused or must be deployed on its own. Do not nest more than 8 routes in one process.
-- SAP: [Apply a Balanced Encapsulation of the Integration Logics](https://github.com/SAP-docs/btp-integration-suite/blob/main/docs/ISuite_Integrations_APIs/apply-a-balanced-encapsulation-of-the-integration-logics-e010db3.md)
-- Check: declaration review; tenant rule "Use Only Allowed Number of Pools and Flow Steps" (judgment condition not checked by this project).
+- Keep the main Integration Process short, so that the flow can be read at a glance. Move steps into a Local Integration Process, called by a Process Call step, when either holds:
+  - the main Integration Process would have **more than 7 steps**, not counting the start event, the end events and the Exception Subprocess;
+  - a few consecutive steps serve one purpose that has a name (for example "read and map the customer data", "build the response"), even when the main process is shorter.
+  The limit of 7 is this skill's rule: SAP gives no number of steps, only the reason (readability and troubleshooting).
+- Name each Local Integration Process after its purpose, like a step (B1): `enrichOrders`, not `Local Integration Process 1`. The Process Call step that calls it is named after the same purpose (`callEnrichOrders`).
+- Inside a Local Integration Process, SAP does not allow another Local Integration Process, an End Message, a sender or a receiver. So a reply to the caller (End Message) is always built in the main Integration Process, and a Local Integration Process cannot be nested to split further. To pass an error on to the main process, end the Local Integration Process with Error End.
+- Whether a Request Reply inside a Local Integration Process may call a receiver system is not stated on that SAP page, and this project has not confirmed it yet. When a design puts a call to another system into a Local Integration Process, say so in "2. Why this shape" and add it to "5. Questions", so that it is checked before building.
+- Prefer a few Local Integration Processes with a clear purpose over many with one or two steps each: a Process Call adds a step of its own.
+- SAP: [Apply a Balanced Encapsulation of the Integration Logics](https://github.com/SAP-docs/btp-integration-suite/blob/main/docs/ISuite_Integrations_APIs/apply-a-balanced-encapsulation-of-the-integration-logics-e010db3.md), [Define Local Integration Process](https://github.com/SAP-docs/btp-integration-suite/blob/main/docs/ISuite_Integrations_APIs/define-local-integration-process-520341a.md) ("You cannot use the following integration flow steps within the Local Integration Process step")
+- Check: declaration review (count the rows of the main flow table); tenant rule "Use Only Allowed Number of Pools and Flow Steps" (judgment condition not checked by this project).
 
 ## B. Applied while building
 
