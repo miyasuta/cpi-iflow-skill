@@ -34,6 +34,14 @@ Write the text in the user's language; keep the headings' numbers, step names an
 ````markdown
 # <design name>
 
+## Purpose
+<one or two sentences: what the design achieves, from where to where>
+
+## Related systems and flows
+| Name | Kind | Direction | Connection |
+|---|---|---|---|
+| <system or iFlow name> | System / iFlow (outside this design) | <calls this iFlow / this iFlow reads from it / this iFlow sends to it / this iFlow calls it> | <adapter and protocol, address or service, authentication type> |
+
 ## Design: <iFlow name, see "Naming conventions" in guidelines.md (B1)>
 
 ### 0. Assumptions
@@ -79,6 +87,15 @@ Correct anything that is wrong before approving.
 - Q2 (rows <#>): <question> — Answered: <the answer, and what it changed>
 ````
 
+Rules for the top of the file (one set per file, also when the design spans several iFlows):
+
+- **Purpose**: one or two sentences on why the design exists and what goes from where to where. No steps: those are in the flow.
+- **Related systems and flows**: one row for each system and for each iFlow *outside this design* that the design touches: a sender that calls it, a system it reads from or sends to, an existing iFlow it calls or that calls it (for example a common error handler). Connections between the iFlows of this design are not listed here; they have Interface sections.
+  - Kind: `System` or `iFlow (outside this design)`.
+  - Direction: seen from the design's iFlow (with several iFlows, name it: "`<iFlow>` calls it").
+  - Connection: what a reader needs to find the other end: adapter and protocol, address, service or ProcessDirect address, authentication type. Never a credential's content.
+- Section "0. Assumptions" keeps the details (volume, credentials, data formats); the top of the file is the overview. They must not contradict each other.
+
 Rules for the flow table:
 
 - One row per step in the order a message passes them. Adapters go in the row of the step they belong to (the sender adapter with the Start row, a receiver adapter with its Request Reply row). The Exception Subprocess is row `E` (inner steps `E1`, `E2`, … if they need their own rows).
@@ -111,11 +128,11 @@ Write it as a Mermaid `flowchart LR`:
 - The Exception Subprocess as `subgraph E ["E handleError (Exception Subprocess)"]` holding its inner steps, not joined to the main flow.
 - A Local Integration Process as a subgraph too, `subgraph L1 ["L1 enrichOrders (Local Integration Process)"]`, with node ids `sL1_1`, `sL1_2`, … and its own Exception Subprocess as a nested subgraph. Join the Process Call step to the subgraph by a dotted edge: `s3 -. "calls" .-> L1`. Write the subgraphs after the main flow's edges (see "Example with Local Integration Processes").
 
-When the design spans several iFlows, add an overview diagram right below the file title, before the first `## Design:` section: one node per iFlow, and one edge per Interface section, labelled with the adapter and address.
+When the design spans several iFlows, add an overview diagram right below "Related systems and flows", before the first `## Design:` section: one node per iFlow, and one edge per Interface section, labelled with the adapter and address.
 
 ## Several iFlows
 
-A design may span several iFlows (for example, to reuse a part or to call a common error handler). Write the overview diagram, sections 0–5 for each iFlow, plus one **Interface** section for each connection between them:
+A design may span several iFlows (for example, to reuse a part or to call a common error handler). Write the top of the file once (Purpose, Related systems and flows), the overview diagram, sections 0–5 for each iFlow, plus one **Interface** section for each connection between them:
 
 ```markdown
 ### Interface: <caller> → <callee>
@@ -135,6 +152,15 @@ The file `docs/Global_SalesOrder_S4_to_OrderService.md`, as first written (befor
 
 ````markdown
 # Global_SalesOrder_S4_to_OrderService
+
+## Purpose
+Send the sales orders from S/4HANA to the order service every hour, as JSON, so that the order service has the same orders as S/4HANA.
+
+## Related systems and flows
+| Name | Kind | Direction | Connection |
+|---|---|---|---|
+| S/4HANA | System | This iFlow reads from it | OData V2, service API_SALES_ORDER_SRV, entity A_SalesOrder |
+| Order service | System | This iFlow sends to it | HTTP POST (REST API), OAuth2 Client Credentials |
 
 ## Design: Global_SalesOrder_S4_to_OrderService
 

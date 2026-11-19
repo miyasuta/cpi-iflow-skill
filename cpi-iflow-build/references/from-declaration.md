@@ -8,7 +8,7 @@ The approval of the declaration is an approval of *what* to build. It is not an 
 
 The format is defined in cpi-iflow-design ([../../cpi-iflow-design/references/process.md](../../cpi-iflow-design/references/process.md), "Declaration format"). This skill relies on:
 
-- `# <design name>`, then for each iFlow `## Design: <iFlow name>` and sections `0. Assumptions`, `1. Flow`, `2. Why this shape`, `3. Externalized`, `4. Build order`, `5. Questions`
+- `# <design name>`, then `## Purpose` and `## Related systems and flows` (an overview for people: build from the sections below; if they contradict section 0, stop and send the person back to cpi-iflow-design), then for each iFlow `## Design: <iFlow name>` and sections `0. Assumptions`, `1. Flow`, `2. Why this shape`, `3. Externalized`, `4. Build order`, `5. Questions`
 - the flow table with columns `#`, `Step name`, `Component`, `Role`; rows `1`, `2`, … in message order; row `E` (and `E1`, `E2`, … for its inner steps) for the Exception Subprocess; "(existing)" at the end of the Role of steps the iFlow already has
 - adapters in the row of the step they belong to: the sender adapter with the Start row, a receiver adapter with its Request Reply row
 - the Component column naming the settings that decide a row's shape (method, authentication type, end event type)
