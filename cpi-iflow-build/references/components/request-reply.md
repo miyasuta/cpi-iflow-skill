@@ -21,4 +21,5 @@ The step has these 3 keys and no settings of its own.
 - Headers of the receiver's response also stayed on the message and came back to the caller, for example `x-powered-by`.
 - A Request Reply with an HTTP receiver (GET, no authentication) deployed and returned the receiver's response when written into an iFlow with an HTTPS sender, with the step placed between Start and End or after a Groovy Script step.
 - Only the HTTP receiver has been deployed with this step.
+- A Request Reply inside a Local Integration Process also called its HTTP receiver, and the response headers it let through stayed on the message in the main process. See [local-integration-process.md](local-integration-process.md).
 - The step's id and name need not be the ones the designer gives: a step written with its own id and name deployed, was called, and the designer showed the name given.

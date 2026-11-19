@@ -269,4 +269,4 @@ flowchart LR
 | L2.E | handleError | Exception Subprocess (Error Start → Error End) | Passes the error on to row E of the main process |
 ````
 
-The call to the order service (row 4) stays in the main process: whether a Request Reply inside a Local Integration Process may call a receiver is not confirmed yet ([guidelines.md](guidelines.md), A7). The reply to the shop (End, End Message) is in the main process because a Local Integration Process cannot contain an End Message.
+The call to the order service (row 4) stays in the main process because it is what the flow is for, and should be seen at a glance. A Request Reply inside a Local Integration Process may also call a receiver ([guidelines.md](guidelines.md), A7). The reply to the shop (End, End Message) is in the main process because a Local Integration Process cannot contain an End Message.
