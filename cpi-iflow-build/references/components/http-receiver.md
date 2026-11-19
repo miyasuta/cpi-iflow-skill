@@ -4,7 +4,7 @@ The HTTP receiver is the adapter on the message flow from a Request Reply step t
 
 ## Settings
 
-All 48 keys below were part of iFlows that were deployed and called with Method GET and Authentication None, and the rows for Method POST and OAuth2 Client Credentials were deployed and called too. Keep the version values as they are.
+All 48 keys below were part of iFlows that were deployed and called with Method GET and Authentication None, and the rows for Method POST, PUT and DELETE, a Query with several pairs, a custom Request Header, another Timeout, OAuth2 Client Credentials and Basic were deployed and called too. Keep the version values as they are.
 
 | UI field | UI choice | Key | Value |
 |---|---|---|---|
@@ -24,16 +24,23 @@ All 48 keys below were part of iFlows that were deployed and called with Method 
 | Adapter | the receiver participant the flow points to | `system` | the `name` of that receiver participant, for example `Receiver` or `Northwind` |
 | Address | the full URL without the query string, for example `https://services.odata.org/V4/Northwind/Northwind.svc/Products(2)` | `httpAddressWithoutQuery` | the URL as it is (parentheses are not escaped) |
 | Query | `$select=ProductID,ProductName` | `httpAddressQuery` | the query without `?`, as it is (no URL encoding, no escaping) |
+| Query | several pairs, for example `a=1&b=2` | `httpAddressQuery` | the pairs joined with `&`, as they are (`&` escaped once as `&amp;` in the `.iflw`) |
 | Query | empty | `httpAddressQuery` | empty |
 | Method | GET | `httpMethod` | `GET` |
 | Method | POST | `httpMethod` | `POST` |
+| Method | PUT | `httpMethod` | `PUT` |
+| Method | Delete | `httpMethod` | `DELETE` (upper case; the UI shows `Delete`) |
 | Authentication | None | `authenticationMethod` | `None` |
 | Authentication | OAuth2 Client Credentials | `authenticationMethod` | `OAuth2 Client Credentials` (the display name, with spaces) |
+| Authentication | Basic | `authenticationMethod` | `Basic` |
 | Credential Name | none (Authentication None) | `credentialName` | empty |
 | Credential Name | OAuth2 Client Credentials | `credentialName` | the Name of an OAuth2 Client Credentials artifact in Security Material, for example `s05-oauth-client` |
-| Send Body | the default (for GET; hidden for POST) | `httpShouldSendBody` | `false` |
+| Credential Name | Basic | `credentialName` | the Name of a User Credentials artifact in Security Material, for example `ZCpiDevEchoBasic` |
+| Send Body | the default (for GET and DELETE; hidden for POST) | `httpShouldSendBody` | `false` (it stayed `false` with PUT and DELETE too) |
 | Timeout in ms | the default | `httpRequestTimeout` | `60000` |
+| Timeout in ms | another value | `httpRequestTimeout` | the milliseconds, for example `30000` |
 | Request Headers | the default | `allowedRequestHeaders` | `traceparent` |
+| Request Headers | a custom header besides the default | `allowedRequestHeaders` | names separated by `\|`, for example `traceparent\|X-Fwd` |
 | Response Headers | the default | `allowedResponseHeaders` | `*` |
 | Throw Exception on Failure | selected | `throwExceptionOnFailure` | `true` |
 | Proxy Type | Internet (default) | `proxyType` | `default` |
@@ -49,9 +56,14 @@ All 48 keys below were part of iFlows that were deployed and called with Method 
 ## Pitfalls
 
 - The value of `authenticationMethod` for OAuth2 Client Credentials is the display name with spaces. The value `OAuth2ClientCredentials` (no spaces) was accepted when pushed, nothing warned about it, and the deployment then failed with a generation error that named no cause. With `OAuth2 Client Credentials` the deployment succeeded.
-- The Credential Name must be the Name of an OAuth2 Client Credentials artifact in Security Material (Monitor > Integrations and APIs > Security Material), already deployed. Ask the user for the name; never write a client ID, a secret or a token anywhere.
+- The Credential Name must be the Name of an artifact in Security Material (Monitor > Integrations and APIs > Security Material), already deployed: OAuth2 Client Credentials for OAuth2 Client Credentials, User Credentials for Basic. Ask the user for the name; never write a client ID, a user, a secret, a password or a token anywhere.
+- A Credential Name with no deployed artifact is not checked at deploy: the deployment succeeded, and the call failed with HTTP 500 even with Throw Exception on Failure not selected. The message log said `No credentials for <name> available. Deploy suitable credentials or adapt credential name in integration flow.`
+- With Basic, SAP's design guideline check reports `USE_SECURE_AUTHENTICATION_METHODS` (High). The deployment was not blocked.
 - With Method GET the receiver got no body: it read an empty string, not `null`. With Method POST it got the current message body, and `httpShouldSendBody` stayed `false`.
 - A URL with parentheses, such as `Products(4)`, is written as it is. A Query with `$`, `=` and `,` is written as it is and reached the receiver.
-- To call another iFlow on the same tenant, the Address is `<runtime host>/http<Address of the target HTTPS sender>`. The runtime host is the `-rt` host, the one a client uses to call that iFlow. The target had User Role `ESBMessaging.send` and CSRF protection off, and the Credential was an OAuth2 Client Credentials artifact made from a service key whose role is `ESBMessaging.send`. That call succeeded.
+- A Query with `&` is not URL-encoded: the receiver read `a=1&b=2` as it was written.
+- The receiver gets the adapter's Method, not the method the iFlow was called with: a POST to the iFlow reached the receiver as PUT or DELETE.
+- With the default Request Headers (`traceparent`), a header the iFlow received was not passed to the receiver. Listed in Request Headers (and in Allowed Header(s) of the calling iFlow), it was passed on.
+- To call another iFlow on the same tenant, the Address is `<runtime host>/http<Address of the target HTTPS sender>`. The runtime host is the `-rt` host, the one a client uses to call that iFlow. The target had User Role `ESBMessaging.send` and CSRF protection off, and the Credential was an OAuth2 Client Credentials artifact made from a service key whose role is `ESBMessaging.send`. That call succeeded. With Basic, a User Credentials artifact whose user and password are the client ID and secret of such a service key worked too.
 - With the default Proxy Type, the tenant reached `https://services.odata.org`.
 - What the caller gets back: the response body is the receiver's body, unchanged, and the request body is not returned. The receiver's response headers come back in lower case, and CPI adds `sap_*` headers. When the receiver is another iFlow, the headers that iFlow set come back too.
