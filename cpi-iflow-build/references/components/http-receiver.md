@@ -28,6 +28,7 @@ All 48 keys below were part of iFlows that were deployed and called with Method 
 | Query | empty | `httpAddressQuery` | empty |
 | Query | from an exchange property | `httpAddressQuery` | `${property.<name>}`, for example `${property.odataQuery}`; with the property empty, the call also worked (a GET of one entity) |
 | Address | a parameter followed by exchange properties | `httpAddressWithoutQuery` | for example `{{A4H_BaseUrl}}${property.odataServicePath}${property.odataResourcePath}` |
+| Address | fixed text with a parameter in the middle or at the end | `httpAddressWithoutQuery` | for example `https://{{echoHost}}/http/zdev/verify-echo-target` or `https://<runtime host>/http/zdev/{{echoPath}}` |
 | Method | GET | `httpMethod` | `GET` |
 | Method | POST | `httpMethod` | `POST` |
 | Method | PUT | `httpMethod` | `PUT` |
