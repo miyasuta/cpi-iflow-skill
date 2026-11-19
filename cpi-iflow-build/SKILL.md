@@ -1,6 +1,6 @@
 ---
 name: cpi-iflow-build
-description: Use when building or changing an SAP Cloud Integration (CPI) integration flow (iFlow) through an MCP server that can write, validate, push, deploy and call iFlows - requires the MCP server's iFlow editing tools; without them the skill only points to the setup. Covers HTTPS sender, Content Modifier (headers, exchange properties, body), Groovy Script, Router on a request header with Allowed Header(s), Request Reply with an HTTP receiver (GET or POST, None or OAuth2 Client Credentials), Exception Subprocess returning an error response, and externalized parameters. Also use to build an iFlow from a design declaration the user approved (from the cpi-iflow-design skill), and when a step, adapter or setting is not in the references yet, so that its value is found, verified by a deployment and added instead of guessed.
+description: Use when building or changing an SAP Cloud Integration (CPI) integration flow (iFlow) through an MCP server that can write, validate, push, deploy and call iFlows - requires the MCP server's iFlow editing tools; without them the skill only points to the setup. Covers HTTPS sender, Content Modifier (headers, exchange properties, body), Groovy Script, Router on a request header with Allowed Header(s), Request Reply with an HTTP receiver (GET, POST, PUT, DELETE or Dynamic; None, Basic or OAuth2 Client Credentials; Cloud Connector; CSRF token and session cookie for SAP backends), ProcessDirect between iFlows, Exception Subprocess returning an error response, and externalized parameters. Also use to build an iFlow from a design declaration the user approved (from the cpi-iflow-design skill), and when a step, adapter or setting is not in the references yet, so that its value is found, verified by a deployment and added instead of guessed.
 ---
 
 # CPI iFlow build
@@ -77,6 +77,7 @@ Read only what the task needs.
 | Groovy Script step and its script file; reading a request header | [references/components/groovy-script.md](references/components/groovy-script.md) |
 | Router: conditions on a header, default route, End per route, Allowed Header(s) | [references/components/router.md](references/components/router.md) |
 | Request Reply step | [references/components/request-reply.md](references/components/request-reply.md) |
-| HTTP receiver: Address, Query, Method, Authentication, Credential Name | [references/components/http-receiver.md](references/components/http-receiver.md) |
+| HTTP receiver: Address, Query, Method, Authentication, Credential Name, Cloud Connector, CSRF token and session cookie, HTTP Session Reuse | [references/components/http-receiver.md](references/components/http-receiver.md) |
 | Exception Subprocess returning an error response | [references/components/exception-subprocess.md](references/components/exception-subprocess.md) |
+| ProcessDirect sender and receiver, headers between iFlows | [references/components/process-direct.md](references/components/process-direct.md) |
 | Externalized parameters: which fields, default and configured values | [references/externalized-parameters.md](references/externalized-parameters.md) |

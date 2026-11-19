@@ -17,6 +17,8 @@ A Router sends the message down one of several routes, chosen by a condition on 
 | Route | Condition Expression, regular expression | condition text | `${header.<name>} regex '<regex>'`, for example `${header.X-V1} regex 'b.*'` |
 | Route | Condition Expression, two conditions | condition text | `<condition> and <condition>`, for example `${header.X-V1} = 'c' and ${header.X-A} = '2'` |
 | Route | Condition Expression, exchange property | condition text | `${property.<name>} = '<value>'`, for example `${property.p1} = 'x'` |
+| Route | Condition Expression, header present | condition text | `${header.<name>} != null`, for example `${header.TravelID} != null` |
+| Route | Condition Expression, HTTP method of the HTTPS sender call | condition text | `${header.CamelHttpMethod} = 'POST'` |
 | Route | Expression Type: XML | `expressionType` | `XML` |
 | Route | Condition Expression, XPath on the body | condition text | an XPath comparison, for example `/r/t = 'a'` |
 | Route | Default Route (no condition) | `expressionType` | `XML` or `NonXML` (both deployed); no condition text |
@@ -42,4 +44,7 @@ A Router sends the message down one of several routes, chosen by a condition on 
 - Conditions were checked in the order the routes were written, and the first one that matched won. With only `X-A: 1`, the `${header.X-A} = '1'` route was taken, even though the later `${header.X-V1} != 'c'` route also matched.
 - A missing header satisfies `!=`. With no `X-V1` header, `${header.X-V1} != 'c'` was true, so that route was taken instead of the default.
 - An XML (XPath) route fails on a body that is not XML. The call returned HTTP 500, the message log said `Content is not allowed in prolog`, and the default route was not taken.
+- `${header.<name>} != null` was true when the header was sent and false when it was not, so the default route was taken without it.
+- `CamelHttpMethod` and `CamelHttpQuery`, set by the HTTPS sender, were read in conditions and expressions without being in Allowed Header(s).
+- Routes may lead into one shared step instead of an End: three routes, each with its own Content Modifier, joined at one Request Reply, and a route with no step at all joined another route's step. This deployed and every route ran.
 - A Router may come after another step, for example a Content Modifier whose exchange property the condition reads. Nine routes all leading to one shared End deployed and ran. A Router's default route may also lead into a second Router.

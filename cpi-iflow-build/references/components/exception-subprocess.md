@@ -25,6 +25,19 @@ The Content Modifier inside takes the settings of [content-modifier.md](content-
 | Message Body > Type | Expression | `bodyType` | `expression` |
 | Message Body | the reply text | `wrapContent` | for example `X04 error: ${exception.message}` |
 
+## Ending with Error End
+
+An Exception Subprocess may end with Error End instead of End Message, with no step in between: Error Start, then Error End. The message then fails, and the caller gets the error.
+
+| UI field | UI choice | Key | Value |
+|---|---|---|---|
+| Error End | (the event itself) | `cmdVariantUri` | `ctype::FlowstepVariant/cname::ErrorEndEvent` (no `version::` part) |
+| Error End | (the event itself) | `activityType` | `EndErrorEvent` |
+
+The two keys sit inside the event's error definition, as for Error Start.
+
+- In an iFlow called through ProcessDirect, an Exception Subprocess ending with Error End made its message `FAILED`, and the calling iFlow's own Exception Subprocess caught the error: its `${exception.message}` held the original error, for example `HTTP operation failed invoking <URL> with statusCode: 503`.
+
 ## Pitfalls
 
 - The Exception Subprocess sits in the main process but is not connected to the main flow. Its events, the Content Modifier and their flows are inside it: Error Start, then the Content Modifier, then End Message.
